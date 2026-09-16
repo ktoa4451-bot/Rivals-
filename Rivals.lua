@@ -2250,3 +2250,820 @@ print("[Rivals Hub 2.1] Loaded successfully.")
 -- END OF RIVALS HUB 2.1
 --========================================================
 
+--========================================================
+-- CREATE PAGES
+--========================================================
+
+local CombatPage = CreatePage("Combat")
+local VisualsPage = CreatePage("Visuals")
+local MovementPage = CreatePage("Movement")
+local SettingsPage = CreatePage("Settings")
+
+--========================================================
+-- PAGE SCROLL SETTINGS
+--========================================================
+
+for _, Page in pairs(Pages) do
+    if Page:IsA("ScrollingFrame") then
+        Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        Page.CanvasSize = UDim2.new(0, 0, 0, 0)
+        Page.ScrollBarThickness = 3
+        Page.ScrollBarImageColor3 = Colors.Accent
+        Page.ScrollBarImageTransparency = 0.25
+    end
+end
+
+--========================================================
+-- COMBAT PAGE
+--========================================================
+
+CreateSection(CombatPage, "Aim")
+
+CreateToggle(
+    CombatPage,
+    "Aim Assist",
+    "Smoothly aims toward a valid target.",
+    "AimAssist",
+    10,
+    function(State)
+        Config.AimAssist = State
+    end
+)
+
+CreateToggle(
+    CombatPage,
+    "Silent Aim",
+    "Client-side target selection foundation.",
+    "SilentAim",
+    20,
+    function(State)
+        Config.SilentAim = State
+    end
+)
+
+CreateDropdown(
+    CombatPage,
+    "Target Part",
+    "Select the preferred target body part.",
+    "TargetPart",
+    {
+        "Head",
+        "HumanoidRootPart",
+        "UpperTorso",
+        "LowerTorso"
+    },
+    30
+)
+
+CreateToggle(
+    CombatPage,
+    "Visible Only",
+    "Only select targets visible to the camera.",
+    "VisibleOnly",
+    40
+)
+
+CreateToggle(
+    CombatPage,
+    "Team Check",
+    "Ignore players on the same team.",
+    "TeamCheck",
+    50
+)
+
+CreateSlider(
+    CombatPage,
+    "Silent Aim FOV",
+    "Maximum target selection radius.",
+    "SilentAimFOV",
+    50,
+    1000,
+    60
+)
+
+CreateToggle(
+    CombatPage,
+    "FOV Circle",
+    "Display the current aim radius.",
+    "SilentAimFOVCircle",
+    70
+)
+
+CreateInfoCard(
+    CombatPage,
+    "Combat",
+    "Aim controls are separated from the visual and movement systems.",
+    80
+)
+
+--========================================================
+-- VISUALS PAGE
+--========================================================
+
+CreateSection(VisualsPage, "ESP")
+
+CreateToggle(
+    VisualsPage,
+    "ESP",
+    "Enable the player visual system.",
+    "ESP",
+    10
+)
+
+CreateToggle(
+    VisualsPage,
+    "Box ESP",
+    "Draw a 2D box around visible players.",
+    "BoxESP",
+    20
+)
+
+CreateToggle(
+    VisualsPage,
+    "Name ESP",
+    "Display player names above their character.",
+    "NameESP",
+    30
+)
+
+CreateToggle(
+    VisualsPage,
+    "Health ESP",
+    "Display player health.",
+    "HealthESP",
+    40
+)
+
+CreateToggle(
+    VisualsPage,
+    "Distance ESP",
+    "Display distance from your character.",
+    "DistanceESP",
+    50
+)
+
+CreateInfoCard(
+    VisualsPage,
+    "Visuals",
+    "ESP elements are handled independently so each visual can be enabled or disabled.",
+    60
+)
+
+--========================================================
+-- MOVEMENT PAGE
+--========================================================
+
+CreateSection(MovementPage, "Movement")
+
+CreateToggle(
+    MovementPage,
+    "Speed",
+    "Change the local character walk speed.",
+    "Speed",
+    10
+)
+
+CreateSlider(
+    MovementPage,
+    "Speed Value",
+    "Select the desired walk speed.",
+    "SpeedValue",
+    20,
+    16,
+    150,
+    20
+)
+
+CreateToggle(
+    MovementPage,
+    "Jump",
+    "Change the local character jump power.",
+    "Jump",
+    30
+)
+
+CreateSlider(
+    MovementPage,
+    "Jump Value",
+    "Select the desired jump power.",
+    "JumpValue",
+    20,
+    50,
+    150,
+    40
+)
+
+CreateToggle(
+    MovementPage,
+    "Noclip",
+    "Disable local character collisions.",
+    "Noclip",
+    50
+)
+
+--========================================================
+-- SETTINGS PAGE
+--========================================================
+
+CreateSection(SettingsPage, "Interface")
+
+CreateToggle(
+    SettingsPage,
+    "Smooth Animations",
+    "Enable smooth interface transitions.",
+    "SmoothAnimations",
+    10,
+    function(State)
+        Config.SmoothAnimations = State
+    end
+)
+
+CreateToggle(
+    SettingsPage,
+    "Animated Background",
+    "Enable the smooth moving background.",
+    "BackgroundAnimation",
+    20,
+    function(State)
+        Config.BackgroundAnimation = State
+    end
+)
+
+CreateInfoCard(
+    SettingsPage,
+    "Rivals Hub 2.1",
+    "Clean interface build with independent Combat, Visuals, Movement and Settings systems.",
+    30
+)
+
+--========================================================
+-- CHARACTER REFERENCES
+--========================================================
+
+local function GetCharacter()
+    return LocalPlayer.Character
+end
+
+local function GetHumanoid()
+    local Character = GetCharacter()
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChildOfClass("Humanoid")
+end
+
+local function GetRoot()
+    local Character = GetCharacter()
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChild("HumanoidRootPart")
+end
+
+--========================================================
+-- MOVEMENT SYSTEM
+--========================================================
+
+local function ApplyMovement()
+    local Humanoid = GetHumanoid()
+
+    if not Humanoid then
+        return
+    end
+
+    if Config.Speed then
+        Humanoid.WalkSpeed =
+            Config.SpeedValue
+    else
+        Humanoid.WalkSpeed = 16
+    end
+
+    if Config.Jump then
+        Humanoid.UseJumpPower = true
+        Humanoid.JumpPower =
+            Config.JumpValue
+    else
+        Humanoid.UseJumpPower = true
+        Humanoid.JumpPower = 50
+    end
+end
+
+Connect(
+    RunService.Heartbeat,
+    function()
+
+        ApplyMovement()
+
+        local Character =
+            GetCharacter()
+
+        if Config.Noclip
+        and Character then
+
+            for _, Object in ipairs(
+                Character:GetDescendants()
+            ) do
+
+                if Object:IsA("BasePart") then
+                    Object.CanCollide = false
+                end
+            end
+        end
+    end
+)
+
+--========================================================
+-- CHARACTER RESPAWN SUPPORT
+--========================================================
+
+Connect(
+    LocalPlayer.CharacterAdded,
+    function()
+
+        task.wait(0.5)
+
+        ApplyMovement()
+
+    end
+)
+
+--========================================================
+-- AIM TARGET SYSTEM
+--========================================================
+
+local Camera =
+    workspace.CurrentCamera
+
+local function GetCharacter()
+    return LocalPlayer.Character
+end
+
+local function GetHumanoid()
+    local Character =
+        GetCharacter()
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChildOfClass(
+        "Humanoid"
+    )
+end
+
+local function GetRoot()
+    local Character =
+        GetCharacter()
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChild(
+        "HumanoidRootPart"
+    )
+end
+
+local function IsAlive(Player)
+
+    if not Player then
+        return false
+    end
+
+    local Character =
+        Player.Character
+
+    if not Character then
+        return false
+    end
+
+    local Humanoid =
+        Character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    return Humanoid ~= nil
+        and Humanoid.Health > 0
+end
+
+local function IsValidTarget(Player)
+
+    if Player == LocalPlayer then
+        return false
+    end
+
+    if not IsAlive(Player) then
+        return false
+    end
+
+    if Config.TeamCheck then
+
+        if LocalPlayer.Team ~= nil
+        and Player.Team ~= nil
+        and LocalPlayer.Team == Player.Team then
+
+            return false
+
+        end
+    end
+
+    return true
+end
+
+local function GetTargetPart(Player)
+
+    if not Player
+    or not Player.Character then
+
+        return nil
+
+    end
+
+    local Character =
+        Player.Character
+
+    local PreferredPart =
+        Character:FindFirstChild(
+            Config.TargetPart
+        )
+
+    if PreferredPart
+    and PreferredPart:IsA("BasePart") then
+
+        return PreferredPart
+
+    end
+
+    return Character:FindFirstChild(
+        "HumanoidRootPart"
+    )
+    or Character:FindFirstChild(
+        "Head"
+    )
+end
+
+local function IsVisible(
+    Part,
+    Character
+)
+
+    if not Part
+    or not Character then
+
+        return false
+
+    end
+
+    Camera =
+        workspace.CurrentCamera
+
+    if not Camera then
+        return false
+    end
+
+    local Origin =
+        Camera.CFrame.Position
+
+    local Direction =
+        Part.Position - Origin
+
+    local Params =
+        RaycastParams.new()
+
+    Params.FilterType =
+        Enum.RaycastFilterType.Exclude
+
+    Params.FilterDescendantsInstances = {
+        LocalPlayer.Character,
+        Character
+    }
+
+    local Result =
+        workspace:Raycast(
+            Origin,
+            Direction,
+            Params
+        )
+
+    return Result == nil
+end
+
+local function GetClosestTarget()
+
+    Camera =
+        workspace.CurrentCamera
+
+    if not Camera then
+        return nil
+    end
+
+    local Viewport =
+        Camera.ViewportSize
+
+    local Center =
+        Vector2.new(
+            Viewport.X / 2,
+            Viewport.Y / 2
+        )
+
+    local ClosestPlayer =
+        nil
+
+    local ClosestDistance =
+        Config.SilentAimFOV
+
+    for _, Player in ipairs(
+        Players:GetPlayers()
+    ) do
+
+        if IsValidTarget(Player) then
+
+            local Part =
+                GetTargetPart(Player)
+
+            if Part then
+
+                local ScreenPosition,
+                    OnScreen =
+                    Camera:WorldToViewportPoint(
+                        Part.Position
+                    )
+
+                if OnScreen then
+
+                    local ScreenPoint =
+                        Vector2.new(
+                            ScreenPosition.X,
+                            ScreenPosition.Y
+                        )
+
+                    local Distance =
+                        (
+                            ScreenPoint
+                            - Center
+                        ).Magnitude
+
+                    if Distance
+                    < ClosestDistance then
+
+                        if not Config.VisibleOnly
+                        or IsVisible(
+                            Part,
+                            Player.Character
+                        ) then
+
+                            ClosestDistance =
+                                Distance
+
+                            ClosestPlayer =
+                                Player
+
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return ClosestPlayer
+end
+
+--========================================================
+-- AIM ASSIST FOUNDATION
+--========================================================
+
+local CurrentTarget =
+    nil
+
+Connect(
+    RunService.RenderStepped,
+    function()
+
+        if not Config.AimAssist then
+
+            CurrentTarget =
+                nil
+
+            return
+        end
+
+        CurrentTarget =
+            GetClosestTarget()
+
+    end
+)
+
+--========================================================
+-- FOV CIRCLE
+--========================================================
+
+local FOVCircle =
+    nil
+
+pcall(function()
+
+    if Drawing
+    and Drawing.new then
+
+        FOVCircle =
+            Drawing.new("Circle")
+
+        FOVCircle.Visible =
+            false
+
+        FOVCircle.Radius =
+            Config.SilentAimFOV
+
+        FOVCircle.Thickness =
+            1.5
+
+        FOVCircle.NumSides =
+            64
+
+        FOVCircle.Filled =
+            false
+
+        FOVCircle.Transparency =
+            0.8
+
+        FOVCircle.Color =
+            Colors.Accent
+
+    end
+end)
+
+Connect(
+    RunService.RenderStepped,
+    function()
+
+        Camera =
+            workspace.CurrentCamera
+
+        if not Camera then
+            return
+        end
+
+        if FOVCircle then
+
+            local Viewport =
+                Camera.ViewportSize
+
+            FOVCircle.Position =
+                Vector2.new(
+                    Viewport.X / 2,
+                    Viewport.Y / 2
+                )
+
+            FOVCircle.Radius =
+                Config.SilentAimFOV
+
+            FOVCircle.Visible =
+                Config.SilentAim
+                and Config.SilentAimFOVCircle
+
+        end
+    end
+)
+
+--========================================================
+-- MOVEMENT SYSTEM
+--========================================================
+
+local function ApplyMovement()
+
+    local Humanoid =
+        GetHumanoid()
+
+    if not Humanoid then
+        return
+    end
+
+    if Config.Speed then
+
+        Humanoid.WalkSpeed =
+            Config.SpeedValue
+
+    else
+
+        Humanoid.WalkSpeed =
+            16
+
+    end
+
+    Humanoid.UseJumpPower =
+        true
+
+    if Config.Jump then
+
+        Humanoid.JumpPower =
+            Config.JumpValue
+
+    else
+
+        Humanoid.JumpPower =
+            50
+
+    end
+end
+
+Connect(
+    RunService.Heartbeat,
+    function()
+
+        ApplyMovement()
+
+        local Character =
+            GetCharacter()
+
+        if Config.Noclip
+        and Character then
+
+            for _, Object in ipairs(
+                Character:GetDescendants()
+            ) do
+
+                if Object:IsA("BasePart") then
+
+                    Object.CanCollide =
+                        false
+
+                end
+            end
+        end
+    end
+)
+
+--========================================================
+-- CHARACTER RESPAWN
+--========================================================
+
+Connect(
+    LocalPlayer.CharacterAdded,
+    function()
+
+        task.wait(0.5)
+
+        ApplyMovement()
+
+    end
+)
+
+--========================================================
+-- CLEANUP
+--========================================================
+
+Connect(
+    Gui.Destroying,
+    function()
+
+        if FOVCircle then
+
+            pcall(function()
+
+                FOVCircle:Remove()
+
+            end)
+
+        end
+    end
+)
+
+--========================================================
+-- FINAL STATE
+--========================================================
+
+task.defer(function()
+
+    ApplyMovement()
+
+    if Config.MenuOpen then
+
+        Holder.Visible =
+            true
+
+        MiniButton.Visible =
+            false
+
+    else
+
+        Holder.Visible =
+            false
+
+        MiniButton.Visible =
+            true
+
+    end
+
+end)
+
+print(
+    "[Rivals Hub 2.1] Loaded successfully."
+)
+
+--========================================================
+-- END OF RIVALS HUB 2.1
+--========================================================
