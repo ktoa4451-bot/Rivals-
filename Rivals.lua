@@ -1,7 +1,7 @@
 --========================================================
--- RIVALS HUB
--- FUNCTIONAL REBUILD
+-- RIVALS HUB 2.0
 -- PART 1/4
+-- UI CORE + ANIMATED BACKGROUND + WINDOW CONTROL
 --========================================================
 
 local Players = game:GetService("Players")
@@ -10,41 +10,40 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 --========================================================
 -- CONFIG
 --========================================================
 
 local Config = {
+
     -- Combat
     AimAssist = false,
-    VisibleOnly = false,
-    AimFOV = false,
-    FOVSize = 250,
-    Smoothness = 0.15,
+    SilentAim = false,
     TargetPart = "Head",
+    SilentAimFOV = 250,
+    SilentAimChance = 100,
+    VisibleOnly = false,
+    TeamCheck = true,
 
     -- Visuals
     ESP = false,
-    ModelESP = false,
-    Box = false,
-    Names = false,
-    Health = false,
-    Distance = false,
-    Speed = false,
+    BoxESP = false,
+    NameESP = false,
+    HealthESP = false,
+    DistanceESP = false,
 
     -- Movement
-    SpeedEnabled = false,
+    Speed = false,
     SpeedValue = 16,
     Jump = false,
-    JumpPower = 50,
+    JumpValue = 50,
     Noclip = false,
 
-    -- Silent Aim UI
-    SilentAim = false,
-    SilentAimPart = "Head",
-    SilentAimChance = 100,
-    SilentAimFOV = 250
+    -- UI
+    MenuOpen = true,
+    MenuDestroyed = false
 }
 
 --========================================================
@@ -52,49 +51,53 @@ local Config = {
 --========================================================
 
 local Colors = {
-    Background = Color3.fromRGB(8, 10, 15),
-    Panel = Color3.fromRGB(13, 16, 23),
+    Background = Color3.fromRGB(7, 9, 14),
+    Panel = Color3.fromRGB(12, 15, 22),
     Card = Color3.fromRGB(20, 24, 33),
 
-    Accent = Color3.fromRGB(80, 145, 255),
-    AccentDark = Color3.fromRGB(45, 95, 190),
+    Accent = Color3.fromRGB(108, 82, 255),
+    AccentDark = Color3.fromRGB(67, 45, 175),
 
-    White = Color3.fromRGB(245, 247, 255),
-    SubText = Color3.fromRGB(160, 168, 185),
-    Muted = Color3.fromRGB(105, 112, 128),
+    White = Color3.fromRGB(245, 246, 255),
+    SubText = Color3.fromRGB(164, 168, 185),
+    Muted = Color3.fromRGB(105, 110, 128),
 
-    On = Color3.fromRGB(80, 145, 255),
-    Off = Color3.fromRGB(45, 49, 60)
+    On = Color3.fromRGB(108, 82, 255),
+    Off = Color3.fromRGB(42, 46, 57)
 }
 
 --========================================================
 -- STATE
 --========================================================
 
-local Destroyed = false
-local MenuOpen = true
+local Connections = {}
 local CurrentCategory = "Combat"
 
-local Connections = {}
-local ESPObjects = {}
-
-local SavedMenuPosition
+local Main
+local Holder
+local MiniButton
 
 --========================================================
--- CONNECTION MANAGEMENT
+-- CONNECTION MANAGER
 --========================================================
 
-local function Connect(Signal, Function)
-    local Connection = Signal:Connect(Function)
-    table.insert(Connections, Connection)
-    return Connection
+local function Connect(signal, callback)
+
+    local connection = signal:Connect(callback)
+
+    table.insert(Connections, connection)
+
+    return connection
 end
 
 local function DisconnectAll()
-    for _, Connection in ipairs(Connections) do
+
+    for _, connection in ipairs(Connections) do
+
         pcall(function()
-            Connection:Disconnect()
+            connection:Disconnect()
         end)
+
     end
 
     table.clear(Connections)
@@ -104,26 +107,25 @@ end
 -- SAFE TWEEN
 --========================================================
 
-local function Tween(Object, Properties, Duration, Style, Direction)
-    if not Object or not Object.Parent then
+local function Tween(object, properties, duration)
+
+    if not object or not object.Parent then
         return
     end
 
-    local Info = TweenInfo.new(
-        Duration or 0.25,
-        Style or Enum.EasingStyle.Quart,
-        Direction or Enum.EasingDirection.Out
+    local tween = TweenService:Create(
+        object,
+        TweenInfo.new(
+            duration or 0.25,
+            Enum.EasingStyle.Quart,
+            Enum.EasingDirection.Out
+        ),
+        properties
     )
 
-    local Animation = TweenService:Create(
-        Object,
-        Info,
-        Properties
-    )
+    tween:Play()
 
-    Animation:Play()
-
-    return Animation
+    return tween
 end
 
 --========================================================
@@ -131,31 +133,13 @@ end
 --========================================================
 
 pcall(function()
-    local PlayerGui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
 
-    if PlayerGui then
-        local Old = PlayerGui:FindFirstChild("RivalsHub")
+    local old = PlayerGui:FindFirstChild("RivalsHub")
 
-        if Old then
-            Old:Destroy()
-        end
+    if old then
+        old:Destroy()
     end
-end)
 
-pcall(function()
-    local CoreGui = game:GetService("CoreGui")
-
-    for _, Name in ipairs({
-        "RivalsHub",
-        "NeutralizationHub",
-        "LunarHub"
-    }) do
-        local Old = CoreGui:FindFirstChild(Name)
-
-        if Old then
-            Old:Destroy()
-        end
-    end
 end)
 
 --========================================================
@@ -163,217 +147,419 @@ end)
 --========================================================
 
 local ScreenGui = Instance.new("ScreenGui")
+
 ScreenGui.Name = "RivalsHub"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.DisplayOrder = 999
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+ScreenGui.Parent = PlayerGui
 
 --========================================================
 -- HOLDER
 --========================================================
 
-local Holder = Instance.new("Frame")
+Holder = Instance.new("Frame")
+
 Holder.Name = "Holder"
+
 Holder.AnchorPoint = Vector2.new(0.5, 0.5)
 Holder.Position = UDim2.fromScale(0.5, 0.5)
 Holder.Size = UDim2.fromOffset(720, 470)
+
 Holder.BackgroundTransparency = 1
 Holder.BorderSizePixel = 0
-Holder.Parent = ScreenGui
 
-SavedMenuPosition = Holder.Position
+Holder.Parent = ScreenGui
 
 --========================================================
 -- SCALE
 --========================================================
 
 local UIScale = Instance.new("UIScale")
-UIScale.Scale = 0.84
+
+UIScale.Scale = 0.82
 UIScale.Parent = Holder
 
 --========================================================
 -- MAIN
 --========================================================
 
-local Main = Instance.new("Frame")
+Main = Instance.new("Frame")
+
 Main.Name = "Main"
+
 Main.Size = UDim2.fromScale(1, 1)
+
 Main.BackgroundColor3 = Colors.Background
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = true
+
 Main.Parent = Holder
 
 local MainCorner = Instance.new("UICorner")
+
 MainCorner.CornerRadius = UDim.new(0, 22)
 MainCorner.Parent = Main
 
 local MainStroke = Instance.new("UIStroke")
+
 MainStroke.Color = Colors.Accent
-MainStroke.Thickness = 1
+MainStroke.Thickness = 1.2
 MainStroke.Transparency = 0.25
+
 MainStroke.Parent = Main
 
 --========================================================
--- BACKGROUND
+-- ANIMATED BACKGROUND
 --========================================================
 
 local Background = Instance.new("Frame")
+
 Background.Name = "AnimatedBackground"
+
 Background.Size = UDim2.fromScale(1, 1)
+
 Background.BackgroundTransparency = 1
 Background.BorderSizePixel = 0
+
 Background.ClipsDescendants = true
-Background.ZIndex = 0
+Background.ZIndex = 1
+
 Background.Parent = Main
 
 local BackgroundCorner = Instance.new("UICorner")
+
 BackgroundCorner.CornerRadius = UDim.new(0, 22)
 BackgroundCorner.Parent = Background
 
-local function CreateLight(Position, Size)
-    local Light = Instance.new("Frame")
-    Light.AnchorPoint = Vector2.new(0.5, 0.5)
-    Light.Position = Position
-    Light.Size = Size
-    Light.BackgroundColor3 = Colors.Accent
-    Light.BackgroundTransparency = 0.88
-    Light.BorderSizePixel = 0
-    Light.ZIndex = 0
-    Light.Parent = Background
+--========================================================
+-- LIGHT CREATOR
+--========================================================
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(1, 0)
-    Corner.Parent = Light
+local BackgroundLights = {}
 
-    return Light
+local function CreateLight(position, size, transparency)
+
+    local light = Instance.new("Frame")
+
+    light.AnchorPoint = Vector2.new(0.5, 0.5)
+
+    light.Position = position
+    light.Size = size
+
+    light.BackgroundColor3 = Colors.Accent
+    light.BackgroundTransparency = transparency or 0.88
+
+    light.BorderSizePixel = 0
+    light.ZIndex = 1
+
+    light.Parent = Background
+
+    local corner = Instance.new("UICorner")
+
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = light
+
+    table.insert(BackgroundLights, light)
+
+    return light
 end
 
 local Light1 = CreateLight(
-    UDim2.fromScale(0.15, 0.2),
-    UDim2.fromOffset(280, 280)
+    UDim2.fromScale(0.08, 0.15),
+    UDim2.fromOffset(280, 280),
+    0.90
 )
 
 local Light2 = CreateLight(
-    UDim2.fromScale(0.82, 0.65),
-    UDim2.fromOffset(320, 320)
+    UDim2.fromScale(0.86, 0.22),
+    UDim2.fromOffset(330, 330),
+    0.92
 )
 
 local Light3 = CreateLight(
-    UDim2.fromScale(0.45, 0.9),
-    UDim2.fromOffset(240, 240)
+    UDim2.fromScale(0.55, 0.92),
+    UDim2.fromOffset(300, 300),
+    0.93
 )
+
+local Light4 = CreateLight(
+    UDim2.fromScale(0.18, 0.82),
+    UDim2.fromOffset(220, 220),
+    0.94
+)
+
+--========================================================
+-- BACKGROUND ANIMATION
+--========================================================
+
+task.spawn(function()
+
+    local t = 0
+
+    while not Config.MenuDestroyed do
+
+        local dt = RunService.RenderStepped:Wait()
+
+        t += dt
+
+        if BackgroundLights[1] then
+
+            BackgroundLights[1].Position =
+                UDim2.fromScale(
+                    0.15 + math.sin(t * 0.32) * 0.10,
+                    0.18 + math.cos(t * 0.25) * 0.08
+                )
+
+        end
+
+        if BackgroundLights[2] then
+
+            BackgroundLights[2].Position =
+                UDim2.fromScale(
+                    0.82 + math.cos(t * 0.22) * 0.09,
+                    0.35 + math.sin(t * 0.30) * 0.10
+                )
+
+        end
+
+        if BackgroundLights[3] then
+
+            BackgroundLights[3].Position =
+                UDim2.fromScale(
+                    0.52 + math.sin(t * 0.20) * 0.13,
+                    0.87 + math.cos(t * 0.27) * 0.06
+                )
+
+        end
+
+        if BackgroundLights[4] then
+
+            BackgroundLights[4].Position =
+                UDim2.fromScale(
+                    0.20 + math.cos(t * 0.29) * 0.08,
+                    0.75 + math.sin(t * 0.24) * 0.09
+                )
+
+        end
+
+    end
+
+end)
 
 --========================================================
 -- TOP BAR
 --========================================================
 
 local TopBar = Instance.new("Frame")
+
 TopBar.Name = "TopBar"
+
 TopBar.Size = UDim2.new(1, 0, 0, 70)
+
 TopBar.BackgroundTransparency = 1
 TopBar.BorderSizePixel = 0
-TopBar.ZIndex = 10
+
+TopBar.ZIndex = 20
 TopBar.Parent = Main
 
+--========================================================
+-- LOGO
+--========================================================
+
 local Logo = Instance.new("TextLabel")
+
 Logo.Name = "Logo"
+
 Logo.BackgroundTransparency = 1
-Logo.Position = UDim2.fromOffset(22, 12)
-Logo.Size = UDim2.fromOffset(44, 44)
+
+Logo.Position = UDim2.fromOffset(20, 12)
+Logo.Size = UDim2.fromOffset(42, 42)
+
 Logo.Font = Enum.Font.GothamBold
+
 Logo.Text = "R"
 Logo.TextColor3 = Colors.Accent
-Logo.TextSize = 25
-Logo.ZIndex = 11
+Logo.TextSize = 24
+
+Logo.ZIndex = 21
 Logo.Parent = TopBar
 
+--========================================================
+-- TITLE
+--========================================================
+
 local Title = Instance.new("TextLabel")
+
 Title.Name = "Title"
+
 Title.BackgroundTransparency = 1
-Title.Position = UDim2.fromOffset(70, 13)
-Title.Size = UDim2.fromOffset(220, 25)
+
+Title.Position = UDim2.fromOffset(66, 12)
+Title.Size = UDim2.fromOffset(230, 25)
+
 Title.Font = Enum.Font.GothamBold
+
 Title.Text = "RIVALS HUB"
 Title.TextColor3 = Colors.White
 Title.TextSize = 17
+
 Title.TextXAlignment = Enum.TextXAlignment.Left
-Title.ZIndex = 11
+
+Title.ZIndex = 21
 Title.Parent = TopBar
 
+--========================================================
+-- VERSION
+--========================================================
+
 local Version = Instance.new("TextLabel")
+
 Version.Name = "Version"
+
 Version.BackgroundTransparency = 1
-Version.Position = UDim2.fromOffset(70, 37)
+
+Version.Position = UDim2.fromOffset(66, 36)
 Version.Size = UDim2.fromOffset(150, 18)
+
 Version.Font = Enum.Font.GothamMedium
-Version.Text = "v1.0"
+
+Version.Text = "v2.0"
 Version.TextColor3 = Colors.Muted
-Version.TextSize = 11
+Version.TextSize = 10
+
 Version.TextXAlignment = Enum.TextXAlignment.Left
-Version.ZIndex = 11
+
+Version.ZIndex = 21
 Version.Parent = TopBar
 
 --========================================================
--- MINIMIZE
+-- BUTTON CREATOR
 --========================================================
 
-local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Name = "Minimize"
-MinimizeButton.AnchorPoint = Vector2.new(1, 0.5)
-MinimizeButton.Position = UDim2.new(1, -52, 0.5, 0)
-MinimizeButton.Size = UDim2.fromOffset(34, 34)
-MinimizeButton.BackgroundColor3 = Colors.Card
-MinimizeButton.BackgroundTransparency = 0.15
-MinimizeButton.BorderSizePixel = 0
-MinimizeButton.AutoButtonColor = false
-MinimizeButton.Text = "—"
-MinimizeButton.TextColor3 = Colors.White
-MinimizeButton.TextSize = 18
-MinimizeButton.Font = Enum.Font.GothamBold
-MinimizeButton.ZIndex = 12
-MinimizeButton.Parent = TopBar
+local function CreateTopButton(text, offset)
 
-local MinCorner = Instance.new("UICorner")
-MinCorner.CornerRadius = UDim.new(1, 0)
-MinCorner.Parent = MinimizeButton
+    local button = Instance.new("TextButton")
+
+    button.BackgroundColor3 = Colors.Card
+    button.BackgroundTransparency = 0.12
+
+    button.BorderSizePixel = 0
+
+    button.AnchorPoint = Vector2.new(1, 0.5)
+
+    button.Position =
+        UDim2.new(1, offset, 0.5, 0)
+
+    button.Size = UDim2.fromOffset(34, 34)
+
+    button.AutoButtonColor = false
+
+    button.Text = text
+    button.TextColor3 = Colors.White
+
+    button.TextSize = 18
+    button.Font = Enum.Font.GothamBold
+
+    button.ZIndex = 25
+
+    button.Parent = TopBar
+
+    local corner = Instance.new("UICorner")
+
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = button
+
+    local stroke = Instance.new("UIStroke")
+
+    stroke.Color = Colors.Accent
+    stroke.Transparency = 0.8
+    stroke.Thickness = 1
+
+    stroke.Parent = button
+
+    Connect(button.MouseEnter, function()
+
+        Tween(
+            button,
+            {
+                BackgroundColor3 = Colors.AccentDark,
+                BackgroundTransparency = 0
+            },
+            0.15
+        )
+
+    end)
+
+    Connect(button.MouseLeave, function()
+
+        Tween(
+            button,
+            {
+                BackgroundColor3 = Colors.Card,
+                BackgroundTransparency = 0.12
+            },
+            0.15
+        )
+
+    end)
+
+    Connect(button.MouseButton1Down, function()
+
+        Tween(
+            button,
+            {
+                Size = UDim2.fromOffset(30, 30)
+            },
+            0.08
+        )
+
+    end)
+
+    Connect(button.MouseButton1Up, function()
+
+        Tween(
+            button,
+            {
+                Size = UDim2.fromOffset(34, 34)
+            },
+            0.10
+        )
+
+    end)
+
+    return button
+end
 
 --========================================================
--- CLOSE
+-- MINIMIZE / CLOSE
 --========================================================
 
-local CloseButton = Instance.new("TextButton")
-CloseButton.Name = "Close"
-CloseButton.AnchorPoint = Vector2.new(1, 0.5)
-CloseButton.Position = UDim2.new(1, -12, 0.5, 0)
-CloseButton.Size = UDim2.fromOffset(34, 34)
-CloseButton.BackgroundColor3 = Colors.Card
-CloseButton.BackgroundTransparency = 0.15
-CloseButton.BorderSizePixel = 0
-CloseButton.AutoButtonColor = false
-CloseButton.Text = "×"
-CloseButton.TextColor3 = Colors.White
-CloseButton.TextSize = 20
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.ZIndex = 12
-CloseButton.Parent = TopBar
+local CloseButton =
+    CreateTopButton("×", -12)
 
-local CloseCorner = Instance.new("UICorner")
-CloseCorner.CornerRadius = UDim.new(1, 0)
-CloseCorner.Parent = CloseButton
+local MinimizeButton =
+    CreateTopButton("—", -52)
 
 --========================================================
 -- BODY
 --========================================================
 
 local Body = Instance.new("Frame")
+
 Body.Name = "Body"
+
 Body.Position = UDim2.fromOffset(0, 70)
-Body.Size = UDim2.new(1, 0, 1, -70)
+
+Body.Size =
+    UDim2.new(1, 0, 1, -70)
+
 Body.BackgroundTransparency = 1
 Body.BorderSizePixel = 0
-Body.ZIndex = 5
+
+Body.ZIndex = 10
 Body.Parent = Main
 
 --========================================================
@@ -381,22 +567,33 @@ Body.Parent = Main
 --========================================================
 
 local Sidebar = Instance.new("Frame")
+
 Sidebar.Name = "Sidebar"
-Sidebar.Size = UDim2.new(0, 175, 1, 0)
+
+Sidebar.Size =
+    UDim2.new(0, 175, 1, 0)
+
 Sidebar.BackgroundTransparency = 1
 Sidebar.BorderSizePixel = 0
-Sidebar.ZIndex = 6
+
+Sidebar.ZIndex = 11
 Sidebar.Parent = Body
 
 local SidebarPadding = Instance.new("UIPadding")
+
 SidebarPadding.PaddingTop = UDim.new(0, 12)
-SidebarPadding.PaddingLeft = UDim.new(0, 11)
-SidebarPadding.PaddingRight = UDim.new(0, 11)
+SidebarPadding.PaddingLeft = UDim.new(0, 12)
+SidebarPadding.PaddingRight = UDim.new(0, 12)
+
 SidebarPadding.Parent = Sidebar
 
 local SidebarLayout = Instance.new("UIListLayout")
+
 SidebarLayout.Padding = UDim.new(0, 8)
-SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+SidebarLayout.SortOrder =
+    Enum.SortOrder.LayoutOrder
+
 SidebarLayout.Parent = Sidebar
 
 --========================================================
@@ -404,51 +601,87 @@ SidebarLayout.Parent = Sidebar
 --========================================================
 
 local Content = Instance.new("Frame")
+
 Content.Name = "Content"
-Content.Position = UDim2.new(0, 175, 0, 0)
-Content.Size = UDim2.new(1, -175, 1, 0)
+
+Content.Position =
+    UDim2.new(0, 175, 0, 0)
+
+Content.Size =
+    UDim2.new(1, -175, 1, 0)
+
 Content.BackgroundTransparency = 1
 Content.BorderSizePixel = 0
+
 Content.ClipsDescendants = true
-Content.ZIndex = 6
+
+Content.ZIndex = 11
 Content.Parent = Body
 
 --========================================================
--- HEADER
+-- PAGE HEADER
 --========================================================
 
 local PageHeader = Instance.new("Frame")
+
 PageHeader.Name = "PageHeader"
-PageHeader.Position = UDim2.fromOffset(20, 12)
-PageHeader.Size = UDim2.new(1, -40, 0, 50)
+
+PageHeader.Position =
+    UDim2.fromOffset(20, 12)
+
+PageHeader.Size =
+    UDim2.new(1, -40, 0, 50)
+
 PageHeader.BackgroundTransparency = 1
 PageHeader.BorderSizePixel = 0
-PageHeader.ZIndex = 7
+
+PageHeader.ZIndex = 12
 PageHeader.Parent = Content
 
 local PageTitle = Instance.new("TextLabel")
+
 PageTitle.Name = "PageTitle"
+
 PageTitle.BackgroundTransparency = 1
-PageTitle.Size = UDim2.new(1, 0, 0, 26)
+
+PageTitle.Size =
+    UDim2.new(1, 0, 0, 25)
+
 PageTitle.Font = Enum.Font.GothamBold
+
 PageTitle.Text = "Combat"
 PageTitle.TextColor3 = Colors.White
 PageTitle.TextSize = 19
-PageTitle.TextXAlignment = Enum.TextXAlignment.Left
-PageTitle.ZIndex = 8
+
+PageTitle.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+PageTitle.ZIndex = 13
 PageTitle.Parent = PageHeader
 
 local PageDescription = Instance.new("TextLabel")
+
 PageDescription.Name = "PageDescription"
-PageDescription.Position = UDim2.fromOffset(0, 27)
-PageDescription.Size = UDim2.new(1, 0, 0, 20)
+
+PageDescription.Position =
+    UDim2.fromOffset(0, 27)
+
+PageDescription.Size =
+    UDim2.new(1, 0, 0, 18)
+
 PageDescription.BackgroundTransparency = 1
-PageDescription.Font = Enum.Font.GothamMedium
+
+PageDescription.Font =
+    Enum.Font.GothamMedium
+
 PageDescription.Text = "Combat features"
 PageDescription.TextColor3 = Colors.SubText
-PageDescription.TextSize = 11
-PageDescription.TextXAlignment = Enum.TextXAlignment.Left
-PageDescription.ZIndex = 8
+PageDescription.TextSize = 10
+
+PageDescription.TextXAlignment =
+    Enum.TextXAlignment.Left
+
+PageDescription.ZIndex = 13
 PageDescription.Parent = PageHeader
 
 --========================================================
@@ -457,34 +690,58 @@ PageDescription.Parent = PageHeader
 
 local Pages = {}
 
-local function CreatePage(Name)
-    local Page = Instance.new("ScrollingFrame")
-    Page.Name = Name
-    Page.Position = UDim2.new(0, 20, 0, 68)
-    Page.Size = UDim2.new(1, -40, 1, -78)
-    Page.BackgroundTransparency = 1
-    Page.BorderSizePixel = 0
-    Page.ScrollBarThickness = 3
-    Page.ScrollBarImageColor3 = Colors.Accent
-    Page.CanvasSize = UDim2.fromOffset(0, 0)
-    Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Page.ScrollingDirection = Enum.ScrollingDirection.Y
-    Page.Visible = false
-    Page.ZIndex = 7
-    Page.Parent = Content
+local function CreatePage(name)
 
-    local Padding = Instance.new("UIPadding")
-    Padding.PaddingBottom = UDim.new(0, 18)
-    Padding.Parent = Page
+    local page = Instance.new("ScrollingFrame")
 
-    local Layout = Instance.new("UIListLayout")
-    Layout.Padding = UDim.new(0, 10)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder
-    Layout.Parent = Page
+    page.Name = name
 
-    Pages[Name] = Page
+    page.Position =
+        UDim2.fromOffset(20, 68)
 
-    return Page
+    page.Size =
+        UDim2.new(1, -40, 1, -78)
+
+    page.BackgroundTransparency = 1
+    page.BorderSizePixel = 0
+
+    page.ScrollBarThickness = 3
+    page.ScrollBarImageColor3 = Colors.Accent
+
+    page.AutomaticCanvasSize =
+        Enum.AutomaticSize.Y
+
+    page.CanvasSize =
+        UDim2.fromOffset(0, 0)
+
+    page.ScrollingDirection =
+        Enum.ScrollingDirection.Y
+
+    page.Visible = false
+
+    page.ZIndex = 12
+    page.Parent = Content
+
+    local padding = Instance.new("UIPadding")
+
+    padding.PaddingBottom =
+        UDim.new(0, 18)
+
+    padding.Parent = page
+
+    local layout = Instance.new("UIListLayout")
+
+    layout.Padding =
+        UDim.new(0, 10)
+
+    layout.SortOrder =
+        Enum.SortOrder.LayoutOrder
+
+    layout.Parent = page
+
+    Pages[name] = page
+
+    return page
 end
 
 CreatePage("Combat")
@@ -493,94 +750,315 @@ CreatePage("Movement")
 CreatePage("Settings")
 
 --========================================================
--- PAGE DESCRIPTIONS
+-- CATEGORY BUTTONS
 --========================================================
 
-local PageDescriptions = {
+local CategoryButtons = {}
+
+local CategoryDescriptions = {
+
     Combat = "Combat features",
-    Visuals = "Player visual features",
+    Visuals = "Visual features",
     Movement = "Movement features",
-    Settings = "Hub information"
+    Settings = "Hub settings"
 }
 
-local CategoryOrder = {
+local CategoryNames = {
+
     "Combat",
     "Visuals",
     "Movement",
     "Settings"
 }
 
+local function CreateCategory(name)
+
+    local button = Instance.new("TextButton")
+
+    button.Name = name
+
+    button.Size =
+        UDim2.new(1, 0, 0, 42)
+
+    button.BackgroundColor3 =
+        Colors.Card
+
+    button.BackgroundTransparency = 1
+
+    button.BorderSizePixel = 0
+
+    button.AutoButtonColor = false
+
+    button.Text = ""
+
+    button.ZIndex = 15
+    button.Parent = Sidebar
+
+    local corner = Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(0, 11)
+
+    corner.Parent = button
+
+    local indicator = Instance.new("Frame")
+
+    indicator.Name = "Indicator"
+
+    indicator.Position =
+        UDim2.fromOffset(6, 8)
+
+    indicator.Size =
+        UDim2.fromOffset(3, 26)
+
+    indicator.BackgroundColor3 =
+        Colors.Accent
+
+    indicator.BackgroundTransparency = 1
+
+    indicator.BorderSizePixel = 0
+
+    indicator.ZIndex = 17
+    indicator.Parent = button
+
+    local indicatorCorner =
+        Instance.new("UICorner")
+
+    indicatorCorner.CornerRadius =
+        UDim.new(1, 0)
+
+    indicatorCorner.Parent =
+        indicator
+
+    local label = Instance.new("TextLabel")
+
+    label.Name = "Label"
+
+    label.Position =
+        UDim2.fromOffset(18, 0)
+
+    label.Size =
+        UDim2.new(1, -25, 1, 0)
+
+    label.BackgroundTransparency = 1
+
+    label.Font =
+        Enum.Font.GothamMedium
+
+    label.Text = name
+
+    label.TextColor3 =
+        Colors.SubText
+
+    label.TextSize = 11
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 17
+    label.Parent = button
+
+    CategoryButtons[name] = {
+
+        Button = button,
+        Indicator = indicator,
+        Label = label
+    }
+
+    return button
+end
+
+for _, category in ipairs(CategoryNames) do
+
+    CreateCategory(category)
+
+end
+
 --========================================================
 -- UI HELPERS
 --========================================================
 
-local function AddCorner(Object, Radius)
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, Radius or 12)
-    Corner.Parent = Object
-    return Corner
+local function AddCorner(object, radius)
+
+    local corner =
+        Instance.new("UICorner")
+
+    corner.CornerRadius =
+        UDim.new(0, radius or 12)
+
+    corner.Parent = object
+
+    return corner
 end
 
-local function AddStroke(Object, Color, Thickness, Transparency)
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color or Colors.Accent
-    Stroke.Thickness = Thickness or 1
-    Stroke.Transparency = Transparency or 0
-    Stroke.Parent = Object
-    return Stroke
+local function AddStroke(
+    object,
+    color,
+    thickness,
+    transparency
+)
+
+    local stroke =
+        Instance.new("UIStroke")
+
+    stroke.Color =
+        color or Colors.Accent
+
+    stroke.Thickness =
+        thickness or 1
+
+    stroke.Transparency =
+        transparency or 0
+
+    stroke.Parent = object
+
+    return stroke
 end
 
-local function CreateSection(Parent, TitleText, DescriptionText)
+--========================================================
+-- SECTION
+--========================================================
 
-    local Section = Instance.new("Frame")
-    Section.Name = TitleText .. "Section"
-    Section.Size = UDim2.new(1, 0, 0, 0)
-    Section.AutomaticSize = Enum.AutomaticSize.Y
-    Section.BackgroundColor3 = Colors.Panel
-    Section.BackgroundTransparency = 0.08
-    Section.BorderSizePixel = 0
-    Section.ZIndex = 8
-    Section.Parent = Parent
+local function AddCorner(object, radius)
 
-    AddCorner(Section, 15)
+    local corner = Instance.new("UICorner")
 
-    local Padding = Instance.new("UIPadding")
-    Padding.PaddingTop = UDim.new(0, 14)
-    Padding.PaddingBottom = UDim.new(0, 14)
-    Padding.PaddingLeft = UDim.new(0, 15)
-    Padding.PaddingRight = UDim.new(0, 15)
-    Padding.Parent = Section
+    corner.CornerRadius =
+        UDim.new(0, radius or 12)
 
-    local Layout = Instance.new("UIListLayout")
-    Layout.Padding = UDim.new(0, 8)
-    Layout.SortOrder = Enum.SortOrder.LayoutOrder
-    Layout.Parent = Section
+    corner.Parent = object
 
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Size = UDim2.new(1, 0, 0, 22)
-    Title.BackgroundTransparency = 1
-    Title.Font = Enum.Font.GothamBold
-    Title.Text = TitleText
-    Title.TextColor3 = Colors.White
-    Title.TextSize = 14
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.ZIndex = 9
-    Title.Parent = Section
+    return corner
+end
 
-    local Description = Instance.new("TextLabel")
-    Description.Name = "Description"
-    Description.Size = UDim2.new(1, 0, 0, 18)
-    Description.BackgroundTransparency = 1
-    Description.Font = Enum.Font.GothamMedium
-    Description.Text = DescriptionText or ""
-    Description.TextColor3 = Colors.Muted
-    Description.TextSize = 10
-    Description.TextXAlignment = Enum.TextXAlignment.Left
-    Description.ZIndex = 9
-    Description.Parent = Section
+local function AddStroke(
+    object,
+    color,
+    thickness,
+    transparency
+)
 
-    return Section
+    local stroke = Instance.new("UIStroke")
+
+    stroke.Color =
+        color or Colors.Accent
+
+    stroke.Thickness =
+        thickness or 1
+
+    stroke.Transparency =
+        transparency or 0
+
+    stroke.Parent = object
+
+    return stroke
+end
+
+local function CreateSection(
+    parent,
+    title,
+    description
+)
+
+    local section = Instance.new("Frame")
+
+    section.Name =
+        title .. "Section"
+
+    section.Size =
+        UDim2.new(1, 0, 0, 0)
+
+    section.AutomaticSize =
+        Enum.AutomaticSize.Y
+
+    section.BackgroundColor3 =
+        Colors.Panel
+
+    section.BackgroundTransparency =
+        0.08
+
+    section.BorderSizePixel = 0
+
+    section.ZIndex = 14
+    section.Parent = parent
+
+    AddCorner(section, 15)
+
+    local padding = Instance.new("UIPadding")
+
+    padding.PaddingTop =
+        UDim.new(0, 14)
+
+    padding.PaddingBottom =
+        UDim.new(0, 14)
+
+    padding.PaddingLeft =
+        UDim.new(0, 15)
+
+    padding.PaddingRight =
+        UDim.new(0, 15)
+
+    padding.Parent = section
+
+    local layout = Instance.new("UIListLayout")
+
+    layout.Padding =
+        UDim.new(0, 8)
+
+    layout.SortOrder =
+        Enum.SortOrder.LayoutOrder
+
+    layout.Parent = section
+
+    local titleLabel = Instance.new("TextLabel")
+
+    titleLabel.Size =
+        UDim2.new(1, 0, 0, 22)
+
+    titleLabel.BackgroundTransparency = 1
+
+    titleLabel.Font =
+        Enum.Font.GothamBold
+
+    titleLabel.Text =
+        title
+
+    titleLabel.TextColor3 =
+        Colors.White
+
+    titleLabel.TextSize = 14
+
+    titleLabel.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    titleLabel.ZIndex = 15
+    titleLabel.Parent = section
+
+    local descLabel = Instance.new("TextLabel")
+
+    descLabel.Size =
+        UDim2.new(1, 0, 0, 17)
+
+    descLabel.BackgroundTransparency = 1
+
+    descLabel.Font =
+        Enum.Font.GothamMedium
+
+    descLabel.Text =
+        description or ""
+
+    descLabel.TextColor3 =
+        Colors.Muted
+
+    descLabel.TextSize = 9
+
+    descLabel.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    descLabel.ZIndex = 15
+    descLabel.Parent = section
+
+    return section
 end
 
 --========================================================
@@ -588,167 +1066,197 @@ end
 --========================================================
 
 local function CreateToggle(
-    Parent,
-    TitleText,
-    DescriptionText,
-    Default,
-    Callback
+    parent,
+    title,
+    description,
+    default,
+    callback
 )
 
-    local Row = Instance.new("Frame")
-    Row.Name = TitleText .. "Toggle"
-    Row.Size = UDim2.new(1, 0, 0, 48)
-    Row.BackgroundColor3 = Colors.Card
-    Row.BackgroundTransparency = 0.18
-    Row.BorderSizePixel = 0
-    Row.ZIndex = 10
-    Row.Parent = Parent
+    local state =
+        default == true
 
-    AddCorner(Row, 11)
+    local row = Instance.new("Frame")
 
-    local Label = Instance.new("TextLabel")
-    Label.Position = UDim2.fromOffset(12, 6)
-    Label.Size = UDim2.new(1, -80, 0, 18)
-    Label.BackgroundTransparency = 1
-    Label.Font = Enum.Font.GothamMedium
-    Label.Text = TitleText
-    Label.TextColor3 = Colors.White
-    Label.TextSize = 12
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.ZIndex = 11
-    Label.Parent = Row
+    row.Name =
+        title .. "Toggle"
 
-    local Description = Instance.new("TextLabel")
-    Description.Position = UDim2.fromOffset(12, 25)
-    Description.Size = UDim2.new(1, -80, 0, 15)
-    Description.BackgroundTransparency = 1
-    Description.Font = Enum.Font.GothamMedium
-    Description.Text = DescriptionText or ""
-    Description.TextColor3 = Colors.Muted
-    Description.TextSize = 9
-    Description.TextXAlignment = Enum.TextXAlignment.Left
-    Description.ZIndex = 11
-    Description.Parent = Row
+    row.Size =
+        UDim2.new(1, 0, 0, 50)
 
-    local Button = Instance.new("TextButton")
-    Button.AnchorPoint = Vector2.new(1, 0.5)
-    Button.Position = UDim2.new(1, -12, 0.5, 0)
-    Button.Size = UDim2.fromOffset(42, 22)
-    Button.BackgroundColor3 =
-        Default and Colors.On or Colors.Off
-    Button.BorderSizePixel = 0
-    Button.AutoButtonColor = false
-    Button.Text = ""
-    Button.ZIndex = 12
-    Button.Parent = Row
+    row.BackgroundColor3 =
+        Colors.Card
 
-    AddCorner(Button, 999)
+    row.BackgroundTransparency =
+        0.18
 
-    local Knob = Instance.new("Frame")
-    Knob.AnchorPoint = Vector2.new(0.5, 0.5)
-    Knob.Position = Default
+    row.BorderSizePixel = 0
+
+    row.ZIndex = 16
+    row.Parent = parent
+
+    AddCorner(row, 11)
+
+    local label = Instance.new("TextLabel")
+
+    label.Position =
+        UDim2.fromOffset(12, 6)
+
+    label.Size =
+        UDim2.new(1, -80, 0, 18)
+
+    label.BackgroundTransparency = 1
+
+    label.Font =
+        Enum.Font.GothamMedium
+
+    label.Text =
+        title
+
+    label.TextColor3 =
+        Colors.White
+
+    label.TextSize = 12
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 17
+    label.Parent = row
+
+    local desc = Instance.new("TextLabel")
+
+    desc.Position =
+        UDim2.fromOffset(12, 26)
+
+    desc.Size =
+        UDim2.new(1, -80, 0, 14)
+
+    desc.BackgroundTransparency = 1
+
+    desc.Font =
+        Enum.Font.GothamMedium
+
+    desc.Text =
+        description or ""
+
+    desc.TextColor3 =
+        Colors.Muted
+
+    desc.TextSize = 9
+
+    desc.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    desc.ZIndex = 17
+    desc.Parent = row
+
+    local button = Instance.new("TextButton")
+
+    button.AnchorPoint =
+        Vector2.new(1, 0.5)
+
+    button.Position =
+        UDim2.new(1, -12, 0.5, 0)
+
+    button.Size =
+        UDim2.fromOffset(42, 22)
+
+    button.BackgroundColor3 =
+        state and Colors.On or Colors.Off
+
+    button.BorderSizePixel = 0
+
+    button.AutoButtonColor = false
+
+    button.Text = ""
+
+    button.ZIndex = 18
+    button.Parent = row
+
+    AddCorner(button, 999)
+
+    local knob = Instance.new("Frame")
+
+    knob.AnchorPoint =
+        Vector2.new(0.5, 0.5)
+
+    knob.Position =
+        state
         and UDim2.new(1, -11, 0.5, 0)
         or UDim2.new(0, 11, 0.5, 0)
-    Knob.Size = UDim2.fromOffset(16, 16)
-    Knob.BackgroundColor3 = Colors.White
-    Knob.BorderSizePixel = 0
-    Knob.ZIndex = 13
-    Knob.Parent = Button
 
-    AddCorner(Knob, 999)
+    knob.Size =
+        UDim2.fromOffset(16, 16)
 
-    local State = Default
+    knob.BackgroundColor3 =
+        Colors.White
 
-    local function SetState(Value)
-        State = Value
+    knob.BorderSizePixel = 0
+
+    knob.ZIndex = 19
+    knob.Parent = button
+
+    AddCorner(knob, 999)
+
+    local function Set(value)
+
+        state = value == true
 
         Tween(
-            Button,
+            button,
             {
                 BackgroundColor3 =
-                    State and Colors.On or Colors.Off
+                    state
+                    and Colors.On
+                    or Colors.Off
             },
             0.16
         )
 
         Tween(
-            Knob,
+            knob,
             {
                 Position =
-                    State
+                    state
                     and UDim2.new(1, -11, 0.5, 0)
                     or UDim2.new(0, 11, 0.5, 0)
             },
             0.18
         )
 
-        if Callback then
+        if callback then
+
             task.spawn(function()
-                Callback(State)
+
+                pcall(function()
+                    callback(state)
+                end)
+
             end)
+
         end
     end
 
-    Connect(Button.MouseButton1Click, function()
-        SetState(not State)
-    end)
+    Connect(
+        button.MouseButton1Click,
+        function()
+
+            Set(not state)
+
+        end
+    )
 
     return {
-        Row = Row,
-        Button = Button,
-        Set = SetState,
+
+        Row = row,
+
+        Set = Set,
+
         Get = function()
-            return State
+            return state
         end
     }
-end
-
---========================================================
--- INFO CARD
---========================================================
-
-local function CreateInfoCard(
-    Parent,
-    TitleText,
-    ValueText
-)
-
-    local Card = Instance.new("Frame")
-    Card.Name = TitleText .. "Info"
-    Card.Size = UDim2.new(1, 0, 0, 48)
-    Card.BackgroundColor3 = Colors.Card
-    Card.BackgroundTransparency = 0.18
-    Card.BorderSizePixel = 0
-    Card.ZIndex = 10
-    Card.Parent = Parent
-
-    AddCorner(Card, 11)
-
-    local Title = Instance.new("TextLabel")
-    Title.Position = UDim2.fromOffset(12, 5)
-    Title.Size = UDim2.new(1, -24, 0, 17)
-    Title.BackgroundTransparency = 1
-    Title.Font = Enum.Font.GothamBold
-    Title.Text = TitleText
-    Title.TextColor3 = Colors.White
-    Title.TextSize = 11
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.ZIndex = 11
-    Title.Parent = Card
-
-    local Value = Instance.new("TextLabel")
-    Value.Position = UDim2.fromOffset(12, 23)
-    Value.Size = UDim2.new(1, -24, 0, 17)
-    Value.BackgroundTransparency = 1
-    Value.Font = Enum.Font.GothamMedium
-    Value.Text = ValueText
-    Value.TextColor3 = Colors.SubText
-    Value.TextSize = 10
-    Value.TextXAlignment = Enum.TextXAlignment.Left
-    Value.ZIndex = 11
-    Value.Parent = Card
-
-    return Card
 end
 
 --========================================================
@@ -756,671 +1264,843 @@ end
 --========================================================
 
 local function CreateDropdown(
-    Parent,
-    TitleText,
-    Options,
-    Default,
-    Callback
+    parent,
+    title,
+    options,
+    default,
+    callback
 )
 
-    local Current = Default
+    local index =
+        table.find(options, default) or 1
 
-    local Row = Instance.new("Frame")
-    Row.Name = TitleText .. "Dropdown"
-    Row.Size = UDim2.new(1, 0, 0, 42)
-    Row.BackgroundColor3 = Colors.Card
-    Row.BackgroundTransparency = 0.18
-    Row.BorderSizePixel = 0
-    Row.ZIndex = 10
-    Row.Parent = Parent
+    local current =
+        options[index]
 
-    AddCorner(Row, 11)
+    local row = Instance.new("Frame")
 
-    local Label = Instance.new("TextLabel")
-    Label.Position = UDim2.fromOffset(12, 0)
-    Label.Size = UDim2.new(0.5, 0, 1, 0)
-    Label.BackgroundTransparency = 1
-    Label.Font = Enum.Font.GothamMedium
-    Label.Text = TitleText
-    Label.TextColor3 = Colors.White
-    Label.TextSize = 11
-    Label.TextXAlignment = Enum.TextXAlignment.Left
-    Label.ZIndex = 11
-    Label.Parent = Row
+    row.Size =
+        UDim2.new(1, 0, 0, 42)
 
-    local Button = Instance.new("TextButton")
-    Button.AnchorPoint = Vector2.new(1, 0.5)
-    Button.Position = UDim2.new(1, -10, 0.5, 0)
-    Button.Size = UDim2.fromOffset(120, 28)
-    Button.BackgroundColor3 = Colors.Background
-    Button.BorderSizePixel = 0
-    Button.AutoButtonColor = false
-    Button.Text = tostring(Current)
-    Button.TextColor3 = Colors.SubText
-    Button.TextSize = 10
-    Button.Font = Enum.Font.GothamMedium
-    Button.ZIndex = 12
-    Button.Parent = Row
+    row.BackgroundColor3 =
+        Colors.Card
 
-    AddCorner(Button, 8)
+    row.BackgroundTransparency =
+        0.18
 
-    local Index = table.find(
-        Options,
-        Current
-    ) or 1
+    row.BorderSizePixel = 0
+
+    row.ZIndex = 16
+    row.Parent = parent
+
+    AddCorner(row, 11)
+
+    local label = Instance.new("TextLabel")
+
+    label.Position =
+        UDim2.fromOffset(12, 0)
+
+    label.Size =
+        UDim2.new(0.5, 0, 1, 0)
+
+    label.BackgroundTransparency = 1
+
+    label.Font =
+        Enum.Font.GothamMedium
+
+    label.Text =
+        title
+
+    label.TextColor3 =
+        Colors.White
+
+    label.TextSize = 11
+
+    label.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    label.ZIndex = 17
+    label.Parent = row
+
+    local button = Instance.new("TextButton")
+
+    button.AnchorPoint =
+        Vector2.new(1, 0.5)
+
+    button.Position =
+        UDim2.new(1, -10, 0.5, 0)
+
+    button.Size =
+        UDim2.fromOffset(120, 28)
+
+    button.BackgroundColor3 =
+        Colors.Background
+
+    button.BorderSizePixel = 0
+
+    button.AutoButtonColor = false
+
+    button.Text =
+        tostring(current)
+
+    button.TextColor3 =
+        Colors.SubText
+
+    button.TextSize = 10
+
+    button.Font =
+        Enum.Font.GothamMedium
+
+    button.ZIndex = 18
+    button.Parent = row
+
+    AddCorner(button, 8)
 
     Connect(
-        Button.MouseButton1Click,
+        button.MouseButton1Click,
         function()
 
-            Index += 1
+            index += 1
 
-            if Index > #Options then
-                Index = 1
+            if index > #options then
+                index = 1
             end
 
-            Current = Options[Index]
+            current =
+                options[index]
 
-            Button.Text =
-                tostring(Current)
+            button.Text =
+                tostring(current)
 
-            if Callback then
-                Callback(Current)
+            if callback then
+
+                pcall(function()
+                    callback(current)
+                end)
+
             end
         end
     )
 
-    return {
-        Row = Row,
-
-        Set = function(Value)
-
-            if table.find(
-                Options,
-                Value
-            ) then
-
-                Current = Value
-                Button.Text =
-                    tostring(Value)
-
-                if Callback then
-                    Callback(Value)
-                end
-            end
-        end,
-
-        Get = function()
-            return Current
-        end
-    }
+    return row
 end
 
 --========================================================
--- CATEGORY SWITCHING
+-- INFO CARD
 --========================================================
 
-local CategoryButtons = {}
+local function CreateInfoCard(
+    parent,
+    title,
+    value
+)
 
-local function SetCategoryActive(Name)
+    local card = Instance.new("Frame")
 
-    for CategoryName, Button in pairs(
-        CategoryButtons
-    ) do
+    card.Size =
+        UDim2.new(1, 0, 0, 48)
 
-        local Active =
-            CategoryName == Name
+    card.BackgroundColor3 =
+        Colors.Card
+
+    card.BackgroundTransparency =
+        0.18
+
+    card.BorderSizePixel = 0
+
+    card.ZIndex = 16
+    card.Parent = parent
+
+    AddCorner(card, 11)
+
+    local titleLabel =
+        Instance.new("TextLabel")
+
+    titleLabel.Position =
+        UDim2.fromOffset(12, 5)
+
+    titleLabel.Size =
+        UDim2.new(1, -24, 0, 17)
+
+    titleLabel.BackgroundTransparency = 1
+
+    titleLabel.Font =
+        Enum.Font.GothamBold
+
+    titleLabel.Text =
+        title
+
+    titleLabel.TextColor3 =
+        Colors.White
+
+    titleLabel.TextSize = 11
+
+    titleLabel.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    titleLabel.ZIndex = 17
+    titleLabel.Parent = card
+
+    local valueLabel =
+        Instance.new("TextLabel")
+
+    valueLabel.Position =
+        UDim2.fromOffset(12, 23)
+
+    valueLabel.Size =
+        UDim2.new(1, -24, 0, 17)
+
+    valueLabel.BackgroundTransparency = 1
+
+    valueLabel.Font =
+        Enum.Font.GothamMedium
+
+    valueLabel.Text =
+        value
+
+    valueLabel.TextColor3 =
+        Colors.SubText
+
+    valueLabel.TextSize = 10
+
+    valueLabel.TextXAlignment =
+        Enum.TextXAlignment.Left
+
+    valueLabel.ZIndex = 17
+    valueLabel.Parent = card
+
+    return card
+end
+
+--========================================================
+-- CATEGORY SWITCH
+--========================================================
+
+local function SwitchCategory(name)
+
+    if not Pages[name] then
+        return
+    end
+
+    CurrentCategory = name
+
+    for category, data in pairs(CategoryButtons) do
+
+        local selected =
+            category == name
 
         Tween(
-            Button,
+            data.Button,
             {
-                BackgroundColor3 =
-                    Active
-                    and Colors.Accent
-                    or Colors.Card,
-
                 BackgroundTransparency =
-                    Active
-                    and 0
-                    or 0.25
+                    selected and 0.08 or 1
             },
             0.18
         )
 
-        local Label =
-            Button:FindFirstChild("Label")
-
-        if Label then
-            Tween(
-                Label,
-                {
-                    TextColor3 =
-                        Active
-                        and Colors.White
-                        or Colors.SubText
-                },
-                0.18
-            )
-        end
-    end
-end
-
---========================================================
--- PAGE SWITCH
---========================================================
-
-local SwitchingPage = false
-
-local function SwitchPage(Name)
-
-    if Destroyed then
-        return
-    end
-
-    if SwitchingPage then
-        return
-    end
-
-    if CurrentCategory == Name then
-        return
-    end
-
-    local NewPage =
-        Pages[Name]
-
-    local OldPage =
-        Pages[CurrentCategory]
-
-    if not NewPage or not OldPage then
-        return
-    end
-
-    SwitchingPage = true
-
-    local OldIndex =
-        table.find(
-            CategoryOrder,
-            CurrentCategory
-        ) or 1
-
-    local NewIndex =
-        table.find(
-            CategoryOrder,
-            Name
-        ) or 1
-
-    local Direction =
-        NewIndex > OldIndex
-        and 1
-        or -1
-
-    NewPage.Position =
-        UDim2.new(
-            Direction,
-            0,
-            0,
-            0
+        Tween(
+            data.Indicator,
+            {
+                BackgroundTransparency =
+                    selected and 0 or 1
+            },
+            0.18
         )
 
-    NewPage.Visible = true
+        Tween(
+            data.Label,
+            {
+                TextColor3 =
+                    selected
+                    and Colors.White
+                    or Colors.SubText
+            },
+            0.18
+        )
 
-    PageTitle.Text = Name
-    PageDescription.Text =
-        PageDescriptions[Name]
-        or ""
+    end
 
-    Tween(
-        OldPage,
-        {
-            Position = UDim2.new(
-                -Direction,
-                0,
-                0,
-                0
-            )
-        },
-        0.28,
-        Enum.EasingStyle.Quart,
-        Enum.EasingDirection.InOut
-    )
+    for category, page in pairs(Pages) do
 
-    Tween(
-        NewPage,
-        {
-            Position = UDim2.new(
-                0,
-                0,
-                0,
-                0
-            )
-        },
-        0.32,
-        Enum.EasingStyle.Quart,
-        Enum.EasingDirection.InOut
-    )
+        if category == name then
 
-    SetCategoryActive(Name)
+            page.Visible = true
 
-    task.delay(
-        0.34,
-        function()
-
-            if Destroyed then
-                return
-            end
-
-            OldPage.Visible = false
-
-            OldPage.Position =
+            page.Position =
                 UDim2.new(
                     0,
+                    28,
                     0,
-                    0,
-                    0
+                    68
                 )
 
-            CurrentCategory = Name
-            SwitchingPage = false
+            Tween(
+                page,
+                {
+                    Position =
+                        UDim2.new(
+                            0,
+                            20,
+                            0,
+                            68
+                        )
+                },
+                0.22
+            )
+
+        else
+
+            page.Visible = false
+
+        end
+
+    end
+
+    PageTitle.Text = name
+
+    PageDescription.Text =
+        CategoryDescriptions[name]
+        or ""
+
+end
+
+for name, data in pairs(CategoryButtons) do
+
+    Connect(
+        data.Button.MouseButton1Click,
+        function()
+
+            SwitchCategory(name)
+
+        end
+    )
+
+end
+
+--========================================================
+-- DRAG SYSTEM
+--========================================================
+
+local dragging = false
+local dragStart
+local startPosition
+
+local function UpdateDrag(input)
+
+    local delta =
+        input.Position - dragStart
+
+    Holder.Position =
+        UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
+        )
+end
+
+Connect(
+    TopBar.InputBegan,
+    function(input)
+
+        if
+            input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+
+            dragging = true
+
+            dragStart =
+                input.Position
+
+            startPosition =
+                Holder.Position
+
+        end
+
+    end
+)
+
+Connect(
+    UserInputService.InputChanged,
+    function(input)
+
+        if not dragging then
+            return
+        end
+
+        if
+            input.UserInputType ==
+            Enum.UserInputType.MouseMovement
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+
+            UpdateDrag(input)
+
+        end
+
+    end
+)
+
+Connect(
+    UserInputService.InputEnded,
+    function(input)
+
+        if
+            input.UserInputType ==
+            Enum.UserInputType.MouseButton1
+            or
+            input.UserInputType ==
+            Enum.UserInputType.Touch
+        then
+
+            dragging = false
+
+        end
+
+    end
+)
+
+--========================================================
+-- MINI BUTTON
+--========================================================
+
+MiniButton =
+    Instance.new("TextButton")
+
+MiniButton.Name =
+    "RivalsMiniButton"
+
+MiniButton.AnchorPoint =
+    Vector2.new(0.5, 0.5)
+
+MiniButton.Position =
+    Holder.Position
+
+MiniButton.Size =
+    UDim2.fromOffset(52, 52)
+
+MiniButton.BackgroundColor3 =
+    Colors.Background
+
+MiniButton.BorderSizePixel = 0
+
+MiniButton.AutoButtonColor = false
+
+MiniButton.Text = "R"
+
+MiniButton.TextColor3 =
+    Colors.Accent
+
+MiniButton.TextSize = 21
+
+MiniButton.Font =
+    Enum.Font.GothamBold
+
+MiniButton.Visible = false
+
+MiniButton.ZIndex = 999
+
+MiniButton.Parent = ScreenGui
+
+AddCorner(MiniButton, 18)
+
+AddStroke(
+    MiniButton,
+    Colors.Accent,
+    1.2,
+    0.25
+)
+
+--========================================================
+-- MINIMIZE
+--========================================================
+
+local function Minimize()
+
+    if not Config.MenuOpen then
+        return
+    end
+
+    Config.MenuOpen = false
+
+    MiniButton.Position =
+        Holder.Position
+
+    MiniButton.Visible = true
+
+    MiniButton.Size =
+        UDim2.fromOffset(10, 10)
+
+    Tween(
+        MiniButton,
+        {
+            Size =
+                UDim2.fromOffset(52, 52)
+        },
+        0.25
+    )
+
+    Tween(
+        UIScale,
+        {
+            Scale = 0.2
+        },
+        0.25
+    )
+
+    Tween(
+        Main,
+        {
+            BackgroundTransparency = 1
+        },
+        0.18
+    )
+
+    task.delay(
+        0.27,
+        function()
+
+            if not Config.MenuOpen then
+
+                Main.Visible = false
+
+                Holder.Size =
+                    UDim2.fromOffset(720, 470)
+
+            end
+
         end
     )
 end
 
 --========================================================
--- CREATE CATEGORY
+-- RESTORE
 --========================================================
 
-local function CreateCategory(Name)
+local function Restore()
 
-    local Button = Instance.new(
-        "TextButton"
+    if Config.MenuOpen then
+        return
+    end
+
+    Config.MenuOpen = true
+
+    Main.Visible = true
+
+    Holder.Size =
+        UDim2.fromOffset(720, 470)
+
+    UIScale.Scale = 0.2
+
+    Main.BackgroundTransparency = 1
+
+    Tween(
+        UIScale,
+        {
+            Scale = 0.82
+        },
+        0.28
     )
 
-    Button.Name =
-        Name .. "Category"
-
-    Button.Size =
-        UDim2.new(
-            1,
-            -22,
-            0,
-            42
-        )
-
-    Button.BackgroundColor3 =
-        Colors.Card
-
-    Button.BackgroundTransparency = 0.25
-    Button.BorderSizePixel = 0
-    Button.AutoButtonColor = false
-    Button.Text = ""
-    Button.ZIndex = 8
-    Button.Parent = Sidebar
-
-    AddCorner(
-        Button,
-        12
+    Tween(
+        Main,
+        {
+            BackgroundTransparency = 0
+        },
+        0.22
     )
 
-    local Label = Instance.new(
-        "TextLabel"
+    Tween(
+        MiniButton,
+        {
+            Size =
+                UDim2.fromOffset(10, 10)
+        },
+        0.18
     )
 
-    Label.Name = "Label"
-    Label.Position =
-        UDim2.fromOffset(
-            14,
-            0
-        )
-
-    Label.Size =
-        UDim2.new(
-            1,
-            -20,
-            1,
-            0
-        )
-
-    Label.BackgroundTransparency = 1
-    Label.Font =
-        Enum.Font.GothamMedium
-
-    Label.Text = Name
-    Label.TextSize = 13
-    Label.TextColor3 =
-        Colors.SubText
-
-    Label.TextXAlignment =
-        Enum.TextXAlignment.Left
-
-    Label.ZIndex = 9
-    Label.Parent = Button
-
-    Connect(
-        Button.MouseEnter,
+    task.delay(
+        0.18,
         function()
 
-            if CurrentCategory ~= Name then
-
-                Tween(
-                    Button,
-                    {
-                        BackgroundTransparency = 0.08
-                    },
-                    0.12
-                )
+            if MiniButton then
+                MiniButton.Visible = false
             end
+
         end
     )
-
-    Connect(
-        Button.MouseLeave,
-        function()
-
-            if CurrentCategory ~= Name then
-
-                Tween(
-                    Button,
-                    {
-                        BackgroundTransparency = 0.25
-                    },
-                    0.12
-                )
-            end
-        end
-    )
-
-    Connect(
-        Button.MouseButton1Click,
-        function()
-            SwitchPage(Name)
-        end
-    )
-
-    CategoryButtons[Name] =
-        Button
-
-    return Button
 end
 
 --========================================================
--- BUILD CATEGORIES
+-- CLOSE
 --========================================================
 
-CreateCategory("Combat")
-CreateCategory("Visuals")
-CreateCategory("Movement")
-CreateCategory("Settings")
+local function CloseMenu()
 
-SetCategoryActive("Combat")
+    if Config.MenuDestroyed then
+        return
+    end
 
-Pages.Combat.Visible = true
-Pages.Visuals.Visible = false
-Pages.Movement.Visible = false
-Pages.Settings.Visible = false
+    Config.MenuDestroyed = true
 
-PageTitle.Text = "Combat"
-PageDescription.Text =
-    PageDescriptions.Combat
+    Tween(
+        UIScale,
+        {
+            Scale = 0.65
+        },
+        0.22
+    )
+
+    Tween(
+        Main,
+        {
+            BackgroundTransparency = 1
+        },
+        0.18
+    )
+
+    task.delay(
+        0.23,
+        function()
+
+            DisconnectAll()
+
+            if ScreenGui then
+                ScreenGui:Destroy()
+            end
+
+        end
+    )
+end
+
+--========================================================
+-- BUTTON CONNECTIONS
+--========================================================
+
+Connect(
+    MinimizeButton.MouseButton1Click,
+    Minimize
+)
+
+Connect(
+    CloseButton.MouseButton1Click,
+    CloseMenu
+)
+
+Connect(
+    MiniButton.MouseButton1Click,
+    Restore
+)
+
+--========================================================
+-- OPEN ANIMATION
+--========================================================
+
+Main.Visible = true
+
+UIScale.Scale = 0.2
+
+Main.BackgroundTransparency = 1
+
+task.defer(function()
+
+    Tween(
+        UIScale,
+        {
+            Scale = 0.82
+        },
+        0.35
+    )
+
+    Tween(
+        Main,
+        {
+            BackgroundTransparency = 0
+        },
+        0.30
+    )
+
+end)
+
+--========================================================
+-- DEFAULT PAGE
+--========================================================
+
+SwitchCategory("Combat")
 
 --========================================================
 -- END PART 1/4
 --========================================================
 
-        --========================================================
--- PART 2/4 — COMBAT
--- Продолжение сразу после PART 1
+--========================================================
+-- RIVALS HUB 2.0
+-- PART 2/4
+-- COMBAT + SILENT AIM + VISUALS
 --========================================================
 
 --========================================================
 -- COMBAT PAGE
 --========================================================
 
-local CombatPage = Pages.Combat
+local CombatPage = Pages["Combat"]
 
 local AimSection = CreateSection(
     CombatPage,
-    "AIM ASSIST",
-    18
+    "Aiming",
+    "Targeting and aim assistance"
 )
 
-local AimToggle = CreateToggle(
-    CombatPage,
+CreateToggle(
+    AimSection,
     "Aim Assist",
-    "Camera assistance toward the closest valid target",
-    55,
-    function(Value)
-        Config.AimAssist = Value
+    "Assist your aim toward nearby targets",
+    Config.AimAssist,
+    function(value)
+        Config.AimAssist = value
     end
 )
 
-local VisibleToggle = CreateToggle(
-    CombatPage,
+CreateToggle(
+    AimSection,
+    "Team Check",
+    "Ignore players on your team",
+    Config.TeamCheck,
+    function(value)
+        Config.TeamCheck = value
+    end
+)
+
+CreateToggle(
+    AimSection,
     "Visible Only",
-    "Only target players that can be seen",
-    115,
-    function(Value)
-        Config.VisibleOnly = Value
+    "Only target visible players",
+    Config.VisibleOnly,
+    function(value)
+        Config.VisibleOnly = value
     end
 )
 
-local AimFOVToggle = CreateToggle(
+--========================================================
+-- SILENT AIM SECTION
+--========================================================
+
+local SilentSection = CreateSection(
     CombatPage,
-    "Aim FOV",
-    "Limit target selection to the FOV circle",
-    175,
-    function(Value)
-        Config.AimFOV = Value
+    "Silent Aim",
+    "Target selection settings"
+)
+
+CreateToggle(
+    SilentSection,
+    "Silent Aim",
+    "Select a target without moving the camera",
+    Config.SilentAim,
+    function(value)
+
+        Config.SilentAim = value
+
     end
 )
 
-local FOVNumber = CreateNumber(
-    CombatPage,
-    "FOV Size",
-    "Aim FOV radius",
-    235,
-    50,
-    800,
-    25,
-    Config.FOVSize,
-    function(Value)
-        Config.FOVSize = Value
-    end
-)
-
-local SmoothNumber = CreateNumber(
-    CombatPage,
-    "Smoothness",
-    "Camera movement smoothness",
-    295,
-    0.01,
-    1,
-    0.01,
-    Config.Smoothness,
-    function(Value)
-        Config.Smoothness = Value
-    end
-)
-
-local TargetDropdown = CreateDropdown(
-    CombatPage,
+CreateDropdown(
+    SilentSection,
     "Target Part",
-    "Body part used for aiming",
-    355,
     {
         "Head",
         "HumanoidRootPart",
-        "UpperTorso"
+        "UpperTorso",
+        "LowerTorso"
     },
     Config.TargetPart,
-    function(Value)
-        Config.TargetPart = Value
+    function(value)
+
+        Config.TargetPart = value
+
     end
 )
 
---========================================================
--- AIM FUNCTIONS
---========================================================
+CreateDropdown(
+    SilentSection,
+    "FOV",
+    {
+        "100",
+        "150",
+        "200",
+        "250",
+        "300",
+        "400",
+        "500"
+    },
+    tostring(Config.SilentAimFOV),
+    function(value)
 
-local function GetCharacter()
-    return LocalPlayer.Character
-end
+        Config.SilentAimFOV =
+            tonumber(value)
+            or Config.SilentAimFOV
 
-local function GetHumanoid(Character)
-    if not Character then
-        return nil
     end
+)
 
-    return Character:FindFirstChildOfClass("Humanoid")
-end
+CreateToggle(
+    SilentSection,
+    "FOV Circle",
+    "Display the silent aim field of view",
+    false,
+    function(value)
 
-local function GetTargetPart(Character)
-    if not Character then
-        return nil
+        Config.SilentAimFOVCircle =
+            value
+
     end
-
-    local Part = Character:FindFirstChild(Config.TargetPart)
-
-    if Part and Part:IsA("BasePart") then
-        return Part
-    end
-
-    return Character:FindFirstChild("Head")
-        or Character:FindFirstChild("HumanoidRootPart")
-        or Character:FindFirstChild("UpperTorso")
-end
-
-local function IsAlive(Player)
-    if not Player or Player == LocalPlayer then
-        return false
-    end
-
-    local Character = Player.Character
-    local Humanoid = GetHumanoid(Character)
-
-    if not Character or not Humanoid then
-        return false
-    end
-
-    return Humanoid.Health > 0
-end
-
-local function IsVisible(TargetPart)
-    if not Config.VisibleOnly then
-        return true
-    end
-
-    local Camera = workspace.CurrentCamera
-
-    if not Camera or not TargetPart then
-        return false
-    end
-
-    local Origin = Camera.CFrame.Position
-    local Direction = TargetPart.Position - Origin
-
-    local Params = RaycastParams.new()
-    Params.FilterType = Enum.RaycastFilterType.Exclude
-    Params.FilterDescendantsInstances = {
-        LocalPlayer.Character
-    }
-
-    local Result = workspace:Raycast(
-        Origin,
-        Direction,
-        Params
-    )
-
-    if not Result then
-        return true
-    end
-
-    return Result.Instance:IsDescendantOf(TargetPart.Parent)
-end
-
-local function GetClosestTarget()
-    local Camera = workspace.CurrentCamera
-
-    if not Camera then
-        return nil
-    end
-
-    local Viewport = Camera.ViewportSize
-    local Center = Vector2.new(
-        Viewport.X / 2,
-        Viewport.Y / 2
-    )
-
-    local BestPart = nil
-    local BestDistance = math.huge
-
-    for _, Player in ipairs(Players:GetPlayers()) do
-        if not IsAlive(Player) then
-            continue
-        end
-
-        local Character = Player.Character
-        local TargetPart = GetTargetPart(Character)
-
-        if not TargetPart then
-            continue
-        end
-
-        if not IsVisible(TargetPart) then
-            continue
-        end
-
-        local ScreenPosition, OnScreen =
-            Camera:WorldToViewportPoint(TargetPart.Position)
-
-        if not OnScreen then
-            continue
-        end
-
-        local Distance = (
-            Vector2.new(
-                ScreenPosition.X,
-                ScreenPosition.Y
-            ) - Center
-        ).Magnitude
-
-        if Config.AimFOV and Distance > Config.FOVSize then
-            continue
-        end
-
-        if Distance < BestDistance then
-            BestDistance = Distance
-            BestPart = TargetPart
-        end
-    end
-
-    return BestPart
-end
+)
 
 --========================================================
 -- FOV CIRCLE
 --========================================================
 
-local FOVCircle = Instance.new("Frame")
-FOVCircle.Name = "AimFOV"
-FOVCircle.AnchorPoint = Vector2.new(0.5, 0.5)
-FOVCircle.Position = UDim2.fromScale(0.5, 0.5)
-FOVCircle.Size = UDim2.fromOffset(
-    Config.FOVSize * 2,
-    Config.FOVSize * 2
-)
-FOVCircle.BackgroundTransparency = 1
-FOVCircle.BorderSizePixel = 0
-FOVCircle.Visible = false
-FOVCircle.ZIndex = 100
-FOVCircle.Parent = ScreenGui
+local Camera =
+    workspace.CurrentCamera
 
-AddCorner(FOVCircle, 999)
+local FOVCircle
 
-local FOVStroke = Instance.new("UIStroke")
-FOVStroke.Thickness = 1.5
-FOVStroke.Transparency = 0.15
-FOVStroke.Color = Colors.Accent
-FOVStroke.Parent = FOVCircle
+local function CreateFOVCircle()
+
+    if FOVCircle then
+
+        FOVCircle:Destroy()
+
+        FOVCircle = nil
+
+    end
+
+    FOVCircle =
+        Drawing.new("Circle")
+
+    FOVCircle.Visible =
+        false
+
+    FOVCircle.Radius =
+        Config.SilentAimFOV
+
+    FOVCircle.Thickness = 1.5
+
+    FOVCircle.Filled = false
+
+    FOVCircle.Color =
+        Colors.Accent
+
+    FOVCircle.Transparency = 0.7
+
+    return FOVCircle
+end
+
+pcall(CreateFOVCircle)
 
 --========================================================
 -- FOV UPDATE
@@ -1429,148 +2109,684 @@ FOVStroke.Parent = FOVCircle
 Connect(
     RunService.RenderStepped,
     function()
-        if Destroyed then
+
+        if not FOVCircle then
             return
         end
 
-        local Camera = workspace.CurrentCamera
+        local viewport =
+            Camera.ViewportSize
 
-        if not Camera then
-            return
-        end
+        FOVCircle.Position =
+            Vector2.new(
+                viewport.X / 2,
+                viewport.Y / 2
+            )
 
-        local Viewport = Camera.ViewportSize
-
-        FOVCircle.Position = UDim2.fromOffset(
-            Viewport.X / 2,
-            Viewport.Y / 2
-        )
-
-        FOVCircle.Size = UDim2.fromOffset(
-            Config.FOVSize * 2,
-            Config.FOVSize * 2
-        )
+        FOVCircle.Radius =
+            Config.SilentAimFOV
 
         FOVCircle.Visible =
-            Config.AimFOV
-            and MenuOpen
-            and not Destroyed
+            Config.SilentAim
+            and Config.SilentAimFOVCircle
+            and not Config.MenuDestroyed
+
     end
 )
 
 --========================================================
--- AIM ASSIST LOOP
+-- TARGET HELPERS
 --========================================================
 
-local AimConnection
+local function IsAlive(player)
 
-AimConnection = RunService:BindToRenderStep(
-    "RivalsHub_AimAssist",
-    Enum.RenderPriority.Camera.Value + 1,
+    if not player then
+        return false
+    end
+
+    local character =
+        player.Character
+
+    if not character then
+        return false
+    end
+
+    local humanoid =
+        character:FindFirstChildOfClass(
+            "Humanoid"
+        )
+
+    if not humanoid then
+        return false
+    end
+
+    return humanoid.Health > 0
+end
+
+local function IsEnemy(player)
+
+    if player == LocalPlayer then
+        return false
+    end
+
+    if not Config.TeamCheck then
+        return true
+    end
+
+    if
+        LocalPlayer.Team ~= nil
+        and player.Team ~= nil
+    then
+
+        return
+            LocalPlayer.Team
+            ~= player.Team
+
+    end
+
+    return true
+end
+
+local function GetTargetPart(character)
+
+    local preferred =
+        Config.TargetPart
+
+    local part =
+        character:FindFirstChild(preferred)
+
+    if part then
+        return part
+    end
+
+    return
+        character:FindFirstChild(
+            "HumanoidRootPart"
+        )
+end
+
+local function IsVisible(part)
+
+    if not Config.VisibleOnly then
+        return true
+    end
+
+    if not part then
+        return false
+    end
+
+    local origin =
+        Camera.CFrame.Position
+
+    local direction =
+        part.Position - origin
+
+    local params =
+        RaycastParams.new()
+
+    params.FilterType =
+        Enum.RaycastFilterType.Exclude
+
+    params.FilterDescendantsInstances = {
+        LocalPlayer.Character
+    }
+
+    local result =
+        workspace:Raycast(
+            origin,
+            direction,
+            params
+        )
+
+    if not result then
+        return true
+    end
+
+    return result.Instance:IsDescendantOf(
+        part.Parent
+    )
+end
+
+local function GetClosestTarget()
+
+    local closestPlayer = nil
+    local closestPart = nil
+    local closestDistance = math.huge
+
+    local viewport =
+        Camera.ViewportSize
+
+    local center =
+        Vector2.new(
+            viewport.X / 2,
+            viewport.Y / 2
+        )
+
+    for _, player in ipairs(
+        Players:GetPlayers()
+    ) do
+
+        if
+            IsAlive(player)
+            and IsEnemy(player)
+        then
+
+            local character =
+                player.Character
+
+            local part =
+                GetTargetPart(character)
+
+            if part then
+
+                local position,
+                    onScreen =
+                    Camera:WorldToViewportPoint(
+                        part.Position
+                    )
+
+                if onScreen then
+
+                    local screenPosition =
+                        Vector2.new(
+                            position.X,
+                            position.Y
+                        )
+
+                    local distance =
+                        (
+                            screenPosition
+                            - center
+                        ).Magnitude
+
+                    if
+                        distance
+                        <= Config.SilentAimFOV
+                        and
+                        distance
+                        < closestDistance
+                        and
+                        IsVisible(part)
+                    then
+
+                        closestDistance =
+                            distance
+
+                        closestPlayer =
+                            player
+
+                        closestPart =
+                            part
+
+                    end
+
+                end
+
+            end
+
+        end
+
+    end
+
+    return
+        closestPlayer,
+        closestPart,
+        closestDistance
+end
+
+--========================================================
+-- CURRENT TARGET
+--========================================================
+
+local CurrentTarget = nil
+local CurrentTargetPart = nil
+
+Connect(
+    RunService.RenderStepped,
     function()
-        if Destroyed then
+
+        if
+            not Config.SilentAim
+            or Config.MenuDestroyed
+        then
+
+            CurrentTarget = nil
+            CurrentTargetPart = nil
+
             return
         end
 
-        if not Config.AimAssist then
-            return
-        end
+        local player, part =
+            GetClosestTarget()
 
-        local Camera = workspace.CurrentCamera
+        CurrentTarget =
+            player
 
-        if not Camera then
-            return
-        end
+        CurrentTargetPart =
+            part
 
-        local Target = GetClosestTarget()
-
-        if not Target then
-            return
-        end
-
-        local CurrentCFrame = Camera.CFrame
-
-        local DesiredCFrame = CFrame.lookAt(
-            CurrentCFrame.Position,
-            Target.Position
-        )
-
-        local Alpha = math.clamp(
-            Config.Smoothness,
-            0.01,
-            1
-        )
-
-        Camera.CFrame =
-            CurrentCFrame:Lerp(
-                DesiredCFrame,
-                Alpha
-            )
     end
 )
 
 --========================================================
--- SILENT AIM — UI ONLY
+-- VISUALS PAGE
 --========================================================
 
-local SilentSection = CreateSection(
-    CombatPage,
-    "SILENT AIM",
-    425
+local VisualsPage = Pages["Visuals"]
+
+local ESPSection = CreateSection(
+    VisualsPage,
+    "Player ESP",
+    "Player information and visual overlays"
 )
 
-local SilentToggle = CreateToggle(
-    CombatPage,
-    "Silent Aim",
-    "Silent Aim interface",
-    470,
-    function(Value)
-        Config.SilentAim = Value
+CreateToggle(
+    ESPSection,
+    "ESP",
+    "Enable player ESP",
+    Config.ESP,
+    function(value)
+
+        Config.ESP = value
+
     end
 )
 
-local SilentPartDropdown = CreateDropdown(
-    CombatPage,
-    "Silent Aim Part",
-    "Preferred target part",
-    530,
-    {
-        "Head",
-        "HumanoidRootPart",
-        "UpperTorso"
-    },
-    Config.SilentAimPart,
-    function(Value)
-        Config.SilentAimPart = Value
+CreateToggle(
+    ESPSection,
+    "Box ESP",
+    "Display boxes around players",
+    Config.BoxESP,
+    function(value)
+
+        Config.BoxESP = value
+
     end
 )
 
-local SilentChanceNumber = CreateNumber(
-    CombatPage,
-    "Hit Chance",
-    "Silent Aim chance",
-    590,
-    0,
-    100,
-    5,
-    Config.SilentAimChance,
-    function(Value)
-        Config.SilentAimChance = Value
+CreateToggle(
+    ESPSection,
+    "Names",
+    "Display player names",
+    Config.NameESP,
+    function(value)
+
+        Config.NameESP = value
+
+    end
+)
+
+CreateToggle(
+    ESPSection,
+    "Health",
+    "Display player health",
+    Config.HealthESP,
+    function(value)
+
+        Config.HealthESP = value
+
+    end
+)
+
+CreateToggle(
+    ESPSection,
+    "Distance",
+    "Display distance to players",
+    Config.DistanceESP,
+    function(value)
+
+        Config.DistanceESP = value
+
     end
 )
 
 --========================================================
--- CLEANUP AIM
+-- ESP CONTAINER
+--========================================================
+
+local ESPObjects = {}
+
+--========================================================
+-- CREATE ESP
+--========================================================
+
+local function CreateESP(player)
+
+    if player == LocalPlayer then
+        return
+    end
+
+    if ESPObjects[player] then
+        return
+    end
+
+    local data = {}
+
+    data.Highlight =
+        Instance.new("Highlight")
+
+    data.Highlight.Name =
+        "RivalsESP"
+
+    data.Highlight.FillColor =
+        Colors.Accent
+
+    data.Highlight.OutlineColor =
+        Colors.White
+
+    data.Highlight.FillTransparency =
+        0.82
+
+    data.Highlight.OutlineTransparency =
+        0.25
+
+    data.Highlight.DepthMode =
+        Enum.HighlightDepthMode.AlwaysOnTop
+
+    data.Highlight.Enabled = false
+
+    data.Highlight.Parent =
+        ScreenGui
+
+    data.Billboard =
+        Instance.new("BillboardGui")
+
+    data.Billboard.Name =
+        "RivalsESPInfo"
+
+    data.Billboard.Size =
+        UDim2.fromOffset(180, 70)
+
+    data.Billboard.StudsOffset =
+        Vector3.new(0, 3.2, 0)
+
+    data.Billboard.AlwaysOnTop =
+        true
+
+    data.Billboard.Enabled =
+        false
+
+    data.Billboard.Parent =
+        ScreenGui
+
+    local container =
+        Instance.new("Frame")
+
+    container.Size =
+        UDim2.fromScale(1, 1)
+
+    container.BackgroundTransparency =
+        1
+
+    container.Parent =
+        data.Billboard
+
+    local layout =
+        Instance.new("UIListLayout")
+
+    layout.HorizontalAlignment =
+        Enum.HorizontalAlignment.Center
+
+    layout.VerticalAlignment =
+        Enum.VerticalAlignment.Center
+
+    layout.Padding =
+        UDim.new(0, 1)
+
+    layout.Parent =
+        container
+
+    data.Name =
+        Instance.new("TextLabel")
+
+    data.Name.Size =
+        UDim2.new(1, 0, 0, 20)
+
+    data.Name.BackgroundTransparency =
+        1
+
+    data.Name.Font =
+        Enum.Font.GothamBold
+
+    data.Name.TextColor3 =
+        Colors.White
+
+    data.Name.TextSize = 11
+
+    data.Name.TextStrokeTransparency =
+        0.5
+
+    data.Name.Text =
+        player.Name
+
+    data.Name.Parent =
+        container
+
+    data.Health =
+        Instance.new("TextLabel")
+
+    data.Health.Size =
+        UDim2.new(1, 0, 0, 18)
+
+    data.Health.BackgroundTransparency =
+        1
+
+    data.Health.Font =
+        Enum.Font.GothamMedium
+
+    data.Health.TextColor3 =
+        Colors.SubText
+
+    data.Health.TextSize = 9
+
+    data.Health.TextStrokeTransparency =
+        0.5
+
+    data.Health.Parent =
+        container
+
+    data.Distance =
+        Instance.new("TextLabel")
+
+    data.Distance.Size =
+        UDim2.new(1, 0, 0, 18)
+
+    data.Distance.BackgroundTransparency =
+        1
+
+    data.Distance.Font =
+        Enum.Font.GothamMedium
+
+    data.Distance.TextColor3 =
+        Colors.SubText
+
+    data.Distance.TextSize = 9
+
+    data.Distance.TextStrokeTransparency =
+        0.5
+
+    data.Distance.Parent =
+        container
+
+    ESPObjects[player] =
+        data
+end
+
+--========================================================
+-- REMOVE ESP
+--========================================================
+
+local function RemoveESP(player)
+
+    local data =
+        ESPObjects[player]
+
+    if not data then
+        return
+    end
+
+    for _, object in pairs(data) do
+
+        if typeof(object) == "Instance" then
+
+            pcall(function()
+                object:Destroy()
+            end)
+
+        end
+
+    end
+
+    ESPObjects[player] = nil
+end
+
+--========================================================
+-- INITIAL ESP
+--========================================================
+
+for _, player in ipairs(
+    Players:GetPlayers()
+) do
+
+    CreateESP(player)
+
+end
+
+Connect(
+    Players.PlayerAdded,
+    function(player)
+
+        CreateESP(player)
+
+    end
+)
+
+Connect(
+    Players.PlayerRemoving,
+    function(player)
+
+        RemoveESP(player)
+
+    end
+)
+
+--========================================================
+-- ESP UPDATE
 --========================================================
 
 Connect(
-    LocalPlayer.CharacterAdded,
+    RunService.RenderStepped,
     function()
-        task.wait(0.2)
 
-        if Destroyed then
-            return
+        for player, data in pairs(
+            ESPObjects
+        ) do
+
+            local character =
+                player.Character
+
+            local humanoid =
+                character
+                and character:FindFirstChildOfClass(
+                    "Humanoid"
+                )
+
+            local root =
+                character
+                and character:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            local enabled =
+                Config.ESP
+                and IsEnemy(player)
+                and humanoid
+                and humanoid.Health > 0
+                and character
+                and root
+
+            if enabled then
+
+                data.Highlight.Adornee =
+                    character
+
+                data.Highlight.Enabled =
+                    Config.ESP
+                    and Config.BoxESP
+
+                data.Billboard.Adornee =
+                    root
+
+                data.Billboard.Enabled =
+                    Config.ESP
+                    and (
+                        Config.NameESP
+                        or Config.HealthESP
+                        or Config.DistanceESP
+                    )
+
+                data.Name.Visible =
+                    Config.NameESP
+
+                data.Health.Visible =
+                    Config.HealthESP
+
+                data.Distance.Visible =
+                    Config.DistanceESP
+
+                if Config.HealthESP then
+
+                    data.Health.Text =
+                        "HP: "
+                        .. math.floor(
+                            humanoid.Health
+                        )
+                        .. " / "
+                        .. math.floor(
+                            humanoid.MaxHealth
+                        )
+
+                end
+
+                if Config.DistanceESP then
+
+                    local localCharacter =
+                        LocalPlayer.Character
+
+                    local localRoot =
+                        localCharacter
+                        and localCharacter:FindFirstChild(
+                            "HumanoidRootPart"
+                        )
+
+                    if localRoot then
+
+                        local distance =
+                            (
+                                root.Position
+                                - localRoot.Position
+                            ).Magnitude
+
+                        data.Distance.Text =
+                            math.floor(distance)
+                            .. " studs"
+
+                    end
+
+                end
+
+            else
+
+                data.Highlight.Enabled =
+                    false
+
+                data.Billboard.Enabled =
+                    false
+
+            end
+
         end
+
     end
 )
 
@@ -1579,550 +2795,225 @@ Connect(
 --========================================================
 
 --========================================================
--- PART 3/4 — VISUALS + MOVEMENT
--- Продолжение сразу после PART 2
+-- RIVALS HUB 2.0
+-- PART 3 / 4
+-- MOVEMENT + SETTINGS
 --========================================================
 
 --========================================================
--- VISUALS PAGE
+-- MOVEMENT
 --========================================================
 
-local VisualsPage = Pages.Visuals
+local MovementPage = Pages["Movement"]
 
-local ESPSection = CreateSection(
-    VisualsPage,
-    "ESP",
-    18
-)
-
-local ESPToggle = CreateToggle(
-    VisualsPage,
-    "ESP",
-    "Enable player ESP",
-    55,
-    function(Value)
-        Config.ESP = Value
-    end
-)
-
-local ModelToggle = CreateToggle(
-    VisualsPage,
-    "Model ESP",
-    "Highlight player characters",
-    115,
-    function(Value)
-        Config.ModelESP = Value
-    end
-)
-
-local BoxToggle = CreateToggle(
-    VisualsPage,
-    "Box",
-    "Display a box around players",
-    175,
-    function(Value)
-        Config.Box = Value
-    end
-)
-
-local NamesToggle = CreateToggle(
-    VisualsPage,
-    "Names",
-    "Display player names",
-    235,
-    function(Value)
-        Config.Names = Value
-    end
-)
-
-local HealthToggle = CreateToggle(
-    VisualsPage,
-    "Health",
-    "Display player health",
-    295,
-    function(Value)
-        Config.Health = Value
-    end
-)
-
-local DistanceToggle = CreateToggle(
-    VisualsPage,
-    "Distance",
-    "Display player distance",
-    355,
-    function(Value)
-        Config.Distance = Value
-    end
-)
-
---========================================================
--- ESP HELPERS
---========================================================
-
-local function RemoveESP(Player)
-    local Data = ESPObjects[Player]
-
-    if not Data then
-        return
-    end
-
-    for _, Object in pairs(Data) do
-        if typeof(Object) == "Instance" then
-            pcall(function()
-                Object:Destroy()
-            end)
-        elseif type(Object) == "table" then
-            for _, SubObject in pairs(Object) do
-                if typeof(SubObject) == "Instance" then
-                    pcall(function()
-                        SubObject:Destroy()
-                    end)
-                end
-            end
-        end
-    end
-
-    ESPObjects[Player] = nil
-end
-
-local function ClearESP()
-    for Player in pairs(ESPObjects) do
-        RemoveESP(Player)
-    end
-
-    table.clear(ESPObjects)
-end
-
-local function CreateESP(Player)
-    if Player == LocalPlayer then
-        return
-    end
-
-    if ESPObjects[Player] then
-        return
-    end
-
-    local Character = Player.Character
-
-    if not Character then
-        return
-    end
-
-    local Root =
-        Character:FindFirstChild("HumanoidRootPart")
-        or Character:FindFirstChild("UpperTorso")
-        or Character:FindFirstChild("Torso")
-
-    local Head = Character:FindFirstChild("Head")
-
-    if not Root or not Head then
-        return
-    end
-
-    local Data = {}
-
-    --====================================================
-    -- HIGHLIGHT / MODEL ESP
-    --====================================================
-
-    if Config.ModelESP then
-        local Highlight = Instance.new("Highlight")
-
-        Highlight.Name = "RivalsHub_ModelESP"
-        Highlight.Adornee = Character
-        Highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        Highlight.FillTransparency = 0.72
-        Highlight.OutlineTransparency = 0.1
-        Highlight.FillColor = Colors.Accent
-        Highlight.OutlineColor = Colors.Accent
-
-        Highlight.Parent = Character
-
-        Data.Highlight = Highlight
-    end
-
-    --====================================================
-    -- BILLBOARD
-    --====================================================
-
-    if Config.Names
-        or Config.Health
-        or Config.Distance then
-
-        local Billboard = Instance.new("BillboardGui")
-
-        Billboard.Name = "RivalsHub_Info"
-        Billboard.Adornee = Head
-        Billboard.Size = UDim2.fromOffset(180, 70)
-        Billboard.StudsOffset = Vector3.new(0, 2.8, 0)
-        Billboard.AlwaysOnTop = true
-        Billboard.Parent = Head
-
-        local Label = Instance.new("TextLabel")
-
-        Label.Name = "Info"
-        Label.BackgroundTransparency = 1
-        Label.Size = UDim2.fromScale(1, 1)
-        Label.Font = Enum.Font.GothamMedium
-        Label.TextSize = 12
-        Label.TextColor3 = Colors.Text
-        Label.TextStrokeTransparency = 0.5
-        Label.TextWrapped = true
-        Label.Parent = Billboard
-
-        Data.Billboard = Billboard
-        Data.Label = Label
-    end
-
-    --====================================================
-    -- BOX
-    --====================================================
-
-    if Config.Box then
-        local Box = Instance.new("BillboardGui")
-
-        Box.Name = "RivalsHub_Box"
-        Box.Adornee = Root
-        Box.Size = UDim2.fromOffset(80, 110)
-        Box.AlwaysOnTop = true
-        Box.Parent = Root
-
-        local Frame = Instance.new("Frame")
-
-        Frame.BackgroundTransparency = 1
-        Frame.Size = UDim2.fromScale(1, 1)
-        Frame.Parent = Box
-
-        AddCorner(Frame, 6)
-
-        local Stroke = Instance.new("UIStroke")
-
-        Stroke.Thickness = 1.5
-        Stroke.Color = Colors.Accent
-        Stroke.Transparency = 0.1
-        Stroke.Parent = Frame
-
-        Data.Box = Box
-        Data.BoxFrame = Frame
-    end
-
-    ESPObjects[Player] = Data
-end
-
---========================================================
--- ESP UPDATE
---========================================================
-
-local function UpdateESP()
-    if Destroyed then
-        ClearESP()
-        return
-    end
-
-    if not Config.ESP then
-        ClearESP()
-        return
-    end
-
-    for _, Player in ipairs(Players:GetPlayers()) do
-        if Player ~= LocalPlayer then
-
-            local Character = Player.Character
-
-            if not Character then
-                RemoveESP(Player)
-                continue
-            end
-
-            local Humanoid =
-                Character:FindFirstChildOfClass("Humanoid")
-
-            if not Humanoid or Humanoid.Health <= 0 then
-                RemoveESP(Player)
-                continue
-            end
-
-            if not ESPObjects[Player] then
-                CreateESP(Player)
-            end
-
-            local Data = ESPObjects[Player]
-
-            if Data then
-                -- Rebuild when options change.
-                local HighlightWanted = Config.ModelESP
-                local BoxWanted = Config.Box
-                local InfoWanted =
-                    Config.Names
-                    or Config.Health
-                    or Config.Distance
-
-                if HighlightWanted ~= (Data.Highlight ~= nil)
-                    or BoxWanted ~= (Data.Box ~= nil)
-                    or InfoWanted ~= (Data.Billboard ~= nil) then
-
-                    RemoveESP(Player)
-                    CreateESP(Player)
-                    Data = ESPObjects[Player]
-                end
-
-                if Data and Data.Label then
-                    local Text = {}
-
-                    if Config.Names then
-                        table.insert(
-                            Text,
-                            Player.DisplayName
-                        )
-                    end
-
-                    if Config.Health then
-                        table.insert(
-                            Text,
-                            "HP: "
-                            .. math.floor(Humanoid.Health)
-                            .. "/"
-                            .. math.floor(Humanoid.MaxHealth)
-                        )
-                    end
-
-                    if Config.Distance then
-                        local Camera =
-                            workspace.CurrentCamera
-
-                        local Root =
-                            Character:FindFirstChild(
-                                "HumanoidRootPart"
-                            )
-
-                        if Camera and Root then
-                            local Distance =
-                                (
-                                    Camera.CFrame.Position
-                                    - Root.Position
-                                ).Magnitude
-
-                            table.insert(
-                                Text,
-                                math.floor(Distance) .. " studs"
-                            )
-                        end
-                    end
-
-                    Data.Label.Text =
-                        table.concat(Text, "\n")
-                end
-            end
-        end
-    end
-end
-
-Connect(
-    RunService.RenderStepped,
-    function()
-        UpdateESP()
-    end
-)
-
---========================================================
--- PLAYER ESP CONNECTIONS
---========================================================
-
-for _, Player in ipairs(Players:GetPlayers()) do
-    if Player ~= LocalPlayer then
-
-        Connect(
-            Player.CharacterAdded,
-            function()
-                RemoveESP(Player)
-
-                if Config.ESP then
-                    task.wait(0.2)
-                    CreateESP(Player)
-                end
-            end
-        )
-
-        Connect(
-            Player.CharacterRemoving,
-            function()
-                RemoveESP(Player)
-            end
-        )
-    end
-end
-
-Connect(
-    Players.PlayerAdded,
-    function(Player)
-
-        Connect(
-            Player.CharacterAdded,
-            function()
-                RemoveESP(Player)
-
-                if Config.ESP then
-                    task.wait(0.2)
-                    CreateESP(Player)
-                end
-            end
-        )
-
-        Connect(
-            Player.CharacterRemoving,
-            function()
-                RemoveESP(Player)
-            end
-        )
-    end
-)
-
-Connect(
-    Players.PlayerRemoving,
-    function(Player)
-        RemoveESP(Player)
-    end
-)
-
---========================================================
--- MOVEMENT PAGE
---========================================================
-
-local MovementPage = Pages.Movement
-
-local MovementSection = CreateSection(
-    MovementPage,
-    "MOVEMENT",
-    18
-)
-
-local SpeedToggle = CreateToggle(
+local SpeedSection = CreateSection(
     MovementPage,
     "Speed",
-    "Change your walking speed",
-    55,
-    function(Value)
-        Config.SpeedEnabled = Value
+    "Movement speed controls"
+)
+
+CreateToggle(
+    SpeedSection,
+    "Speed",
+    "Change your movement speed",
+    Config.Speed,
+    function(value)
+        Config.Speed = value
     end
 )
 
-local SpeedNumber = CreateNumber(
-    MovementPage,
+CreateDropdown(
+    SpeedSection,
     "Speed Value",
-    "Walking speed",
-    115,
-    1,
-    100,
-    1,
-    Config.SpeedValue,
-    function(Value)
-        Config.SpeedValue = Value
+    {"16", "24", "32", "40", "50", "75", "100"},
+    tostring(Config.SpeedValue),
+    function(value)
+        Config.SpeedValue = tonumber(value) or 16
     end
 )
 
-local JumpToggle = CreateToggle(
+local JumpSection = CreateSection(
     MovementPage,
     "Jump",
-    "Change your jump power",
-    175,
-    function(Value)
-        Config.Jump = Value
+    "Jump power controls"
+)
+
+CreateToggle(
+    JumpSection,
+    "High Jump",
+    "Increase jump power",
+    Config.Jump,
+    function(value)
+        Config.Jump = value
     end
 )
 
-local JumpNumber = CreateNumber(
-    MovementPage,
-    "Jump Power",
-    "Jump power value",
-    235,
-    1,
-    200,
-    5,
-    Config.JumpPower,
-    function(Value)
-        Config.JumpPower = Value
+CreateDropdown(
+    JumpSection,
+    "Jump Value",
+    {"50", "75", "100", "125", "150", "200"},
+    tostring(Config.JumpValue),
+    function(value)
+        Config.JumpValue = tonumber(value) or 50
     end
 )
 
-local NoclipToggle = CreateToggle(
+local NoclipSection = CreateSection(
     MovementPage,
     "Noclip",
-    "Disable character collisions",
-    295,
-    function(Value)
-        Config.Noclip = Value
+    "Collision control"
+)
+
+CreateToggle(
+    NoclipSection,
+    "Noclip",
+    "Walk through solid objects",
+    Config.Noclip,
+    function(value)
+        Config.Noclip = value
     end
 )
 
-local MovementInfo = CreateInfoCard(
+CreateInfoCard(
     MovementPage,
-    "MOVEMENT INFO",
-    "Speed, Jump and Noclip are applied locally and are restored when disabled.",
-    355
+    "Movement",
+    "Speed, jump and noclip are applied locally to your character."
 )
 
 --========================================================
--- MOVEMENT FUNCTIONS
+-- MOVEMENT STATE
 --========================================================
 
-local function ApplyMovementSettings()
-    if Destroyed then
+local OriginalWalkSpeed = 16
+local OriginalJumpPower = 50
+local SavedHumanoid = nil
+
+local function GetHumanoid()
+    local Character = LocalPlayer.Character
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChildOfClass("Humanoid")
+end
+
+local function SaveHumanoidDefaults(Humanoid)
+    if not Humanoid then
         return
     end
 
+    if SavedHumanoid ~= Humanoid then
+        SavedHumanoid = Humanoid
+
+        OriginalWalkSpeed = Humanoid.WalkSpeed
+        OriginalJumpPower = Humanoid.JumpPower
+    end
+end
+
+local function RestoreMovement(Humanoid)
+    if not Humanoid then
+        return
+    end
+
+    Humanoid.WalkSpeed = OriginalWalkSpeed
+    Humanoid.UseJumpPower = true
+    Humanoid.JumpPower = OriginalJumpPower
+end
+
+local function ApplyMovement()
     local Character = LocalPlayer.Character
 
     if not Character then
         return
     end
 
-    local Humanoid =
-        Character:FindFirstChildOfClass("Humanoid")
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 
     if not Humanoid then
         return
     end
 
-    if Config.SpeedEnabled then
+    SaveHumanoidDefaults(Humanoid)
+
+    --------------------------------------------------------
+    -- SPEED
+    --------------------------------------------------------
+
+    if Config.Speed then
         Humanoid.WalkSpeed = Config.SpeedValue
     else
-        Humanoid.WalkSpeed = 16
+        Humanoid.WalkSpeed = OriginalWalkSpeed
     end
 
+    --------------------------------------------------------
+    -- JUMP
+    --------------------------------------------------------
+
+    Humanoid.UseJumpPower = true
+
     if Config.Jump then
-        Humanoid.UseJumpPower = true
-        Humanoid.JumpPower = Config.JumpPower
+        Humanoid.JumpPower = Config.JumpValue
     else
-        Humanoid.UseJumpPower = true
-        Humanoid.JumpPower = 50
+        Humanoid.JumpPower = OriginalJumpPower
     end
 end
 
+--========================================================
+-- NOCLIP
+--========================================================
+
+local function ApplyNoclip()
+    local Character = LocalPlayer.Character
+
+    if not Character then
+        return
+    end
+
+    for _, Object in ipairs(Character:GetDescendants()) do
+        if Object:IsA("BasePart") then
+
+            if Config.Noclip then
+                Object.CanCollide = false
+            end
+
+        end
+    end
+end
+
+local function RestoreCollision()
+    local Character = LocalPlayer.Character
+
+    if not Character then
+        return
+    end
+
+    for _, Object in ipairs(Character:GetDescendants()) do
+        if Object:IsA("BasePart") then
+
+            if Object.Name ~= "HumanoidRootPart" then
+                Object.CanCollide = true
+            end
+
+        end
+    end
+end
+
+--========================================================
+-- MOVEMENT LOOP
+--========================================================
+
 Connect(
-    RunService.Heartbeat,
+    RunService.Stepped,
     function()
-        ApplyMovementSettings()
-
-        local Character = LocalPlayer.Character
-
-        if not Character then
+        if Config.MenuDestroyed then
             return
         end
 
+        ApplyMovement()
+
         if Config.Noclip then
-            for _, Object in ipairs(Character:GetDescendants()) do
-                if Object:IsA("BasePart") then
-                    Object.CanCollide = false
-                end
-            end
-        else
-            for _, Object in ipairs(Character:GetDescendants()) do
-                if Object:IsA("BasePart") then
-                    if Object.Name ~= "HumanoidRootPart" then
-                        Object.CanCollide = true
-                    end
-                end
-            end
+            ApplyNoclip()
         end
     end
 )
@@ -2134,702 +3025,1039 @@ Connect(
 Connect(
     LocalPlayer.CharacterAdded,
     function(Character)
-        task.wait(0.25)
 
-        if Destroyed then
-            return
-        end
+        SavedHumanoid = nil
 
-        local Humanoid =
-            Character:FindFirstChildOfClass("Humanoid")
+        local Humanoid = Character:WaitForChild(
+            "Humanoid",
+            10
+        )
 
         if Humanoid then
-            ApplyMovementSettings()
+            task.wait(0.25)
+            ApplyMovement()
         end
     end
 )
 
 --========================================================
--- END PART 3/4
+-- SETTINGS
 --========================================================
 
---========================================================
--- PART 4/4 — ANIMATIONS + MINIMIZE + CLOSE + DRAG
--- Продолжение сразу после PART 3
---========================================================
+local SettingsPage = Pages["Settings"]
 
---========================================================
--- CATEGORY ANIMATIONS
---========================================================
+local MenuSection = CreateSection(
+    SettingsPage,
+    "Menu",
+    "Interface and menu controls"
+)
 
-local PageBusy = false
+CreateDropdown(
+    MenuSection,
+    "UI Scale",
+    {"80", "90", "100", "110", "120"},
+    "100",
+    function(value)
 
-local function AnimatePage(NewPage)
-    if PageBusy or Destroyed then
-        return
-    end
+        local Number = tonumber(value)
 
-    if not NewPage then
-        return
-    end
-
-    PageBusy = true
-
-    local OldPage = nil
-
-    for _, Page in pairs(Pages) do
-        if Page.Visible then
-            OldPage = Page
-            break
-        end
-    end
-
-    if OldPage == NewPage then
-        PageBusy = false
-        return
-    end
-
-    local Direction = 1
-
-    if CurrentCategory == "Settings" then
-        Direction = -1
-    end
-
-    NewPage.Position = UDim2.new(
-        Direction,
-        Direction == 1 and 35 or -35,
-        0,
-        0
-    )
-
-    NewPage.Visible = true
-
-    if OldPage then
-        Tween(
-            OldPage,
-            {
-                Position = UDim2.new(
-                    -Direction,
-                    Direction == 1 and -35 or 35,
-                    0,
-                    0
-                )
-            },
-            0.18,
-            Enum.EasingStyle.Quint
-        )
-    end
-
-    Tween(
-        NewPage,
-        {
-            Position = UDim2.new(0, 0, 0, 0)
-        },
-        0.22,
-        Enum.EasingStyle.Quint
-    )
-
-    task.delay(0.23, function()
-        if Destroyed then
+        if not Number then
             return
         end
 
-        if OldPage and OldPage ~= NewPage then
-            OldPage.Visible = false
-            OldPage.Position =
-                UDim2.new(0, 0, 0, 0)
+        Number = math.clamp(Number, 80, 120)
+
+        UIScale.Scale = Number / 100
+
+    end
+)
+
+local AnimationSection = CreateSection(
+    SettingsPage,
+    "Animations",
+    "Interface animation settings"
+)
+
+CreateToggle(
+    AnimationSection,
+    "Smooth Animations",
+    "Use smooth menu transitions",
+    true,
+    function(value)
+
+        Config.SmoothAnimations = value
+
+    end
+)
+
+CreateToggle(
+    AnimationSection,
+    "Animated Background",
+    "Animate the background lights",
+    true,
+    function(value)
+
+        Config.BackgroundAnimation = value
+
+    end
+)
+
+--========================================================
+-- EXTRA CONFIG VALUES
+--========================================================
+
+Config.SmoothAnimations = true
+Config.BackgroundAnimation = true
+
+--========================================================
+-- ANIMATION HELPER
+--========================================================
+
+local function SmartTween(Object, Properties, Time)
+
+    if Config.SmoothAnimations == false then
+        for Property, Value in pairs(Properties) do
+            Object[Property] = Value
         end
 
-        PageBusy = false
-    end)
-end
-
-local function SelectCategory(Category)
-    if Destroyed or PageBusy then
-        return
+        return nil
     end
 
-    if not Pages[Category] then
-        return
-    end
-
-    if CurrentCategory == Category then
-        return
-    end
-
-    local Previous = CurrentCategory
-    CurrentCategory = Category
-
-    local Button = CategoryButtons[Category]
-
-    if Button then
-        for Name, OtherButton in pairs(CategoryButtons) do
-            local Selected =
-                Name == Category
-
-            Tween(
-                OtherButton,
-                {
-                    BackgroundTransparency =
-                        Selected and 0.08 or 1
-                },
-                0.16,
-                Enum.EasingStyle.Quint
-            )
-
-            local Accent =
-                OtherButton:FindFirstChild("Accent")
-
-            if Accent then
-                Tween(
-                    Accent,
-                    {
-                        BackgroundTransparency =
-                            Selected and 0 or 1
-                    },
-                    0.16,
-                    Enum.EasingStyle.Quint
-                )
-            end
-        end
-    end
-
-    local Title =
-        PageDescriptions[Category]
-
-    if PageTitle then
-        Tween(
-            PageTitle,
-            {
-                TextTransparency = 1
-            },
-            0.08
-        )
-
-        task.delay(0.08, function()
-            if Destroyed then
-                return
-            end
-
-            PageTitle.Text = Category
-
-            Tween(
-                PageTitle,
-                {
-                    TextTransparency = 0
-                },
-                0.14
-            )
-        end)
-    end
-
-    if PageDescription then
-        Tween(
-            PageDescription,
-            {
-                TextTransparency = 1
-            },
-            0.08
-        )
-
-        task.delay(0.08, function()
-            if Destroyed then
-                return
-            end
-
-            PageDescription.Text =
-                Title or ""
-
-            Tween(
-                PageDescription,
-                {
-                    TextTransparency = 0
-                },
-                0.14
-            )
-        end)
-    end
-
-    AnimatePage(Pages[Category])
-end
-
-for Category, Button in pairs(CategoryButtons) do
-    Connect(
-        Button.MouseButton1Click,
-        function()
-            SelectCategory(Category)
-        end
+    return Tween(
+        Object,
+        Properties,
+        Time or 0.25
     )
 end
 
 --========================================================
--- INITIAL CATEGORY
+-- BACKGROUND ANIMATION CONTROL
 --========================================================
 
-for Name, Page in pairs(Pages) do
-    Page.Visible = Name == "Combat"
-    Page.Position = UDim2.new(0, 0, 0, 0)
-end
+task.spawn(function()
 
-CurrentCategory = "Combat"
+    while not Config.MenuDestroyed do
 
-if CategoryButtons.Combat then
-    CategoryButtons.Combat.BackgroundTransparency = 0.08
+        if Config.BackgroundAnimation then
 
-    local Accent =
-        CategoryButtons.Combat:FindFirstChild("Accent")
+            for Index, Light in ipairs(BackgroundLights) do
 
-    if Accent then
-        Accent.BackgroundTransparency = 0
+                if Light and Light.Parent then
+
+                    local OffsetX =
+                        math.sin(
+                            os.clock() * (0.7 + Index * 0.12)
+                        ) * 35
+
+                    local OffsetY =
+                        math.cos(
+                            os.clock() * (0.5 + Index * 0.08)
+                        ) * 25
+
+                    Light.Position =
+                        UDim2.new(
+                            Light.Position.X.Scale,
+                            Light.Position.X.Offset + OffsetX,
+                            Light.Position.Y.Scale,
+                            Light.Position.Y.Offset + OffsetY
+                        )
+
+                end
+
+            end
+
+        end
+
+        RunService.RenderStepped:Wait()
+
     end
-end
+
+end)
 
 --========================================================
--- BACKGROUND ANIMATION
+-- RESET MOVEMENT
 --========================================================
 
-local BackgroundObjects = {}
+local ResetSection = CreateSection(
+    SettingsPage,
+    "Reset",
+    "Restore default movement values"
+)
 
-for _, Object in ipairs(Main:GetDescendants()) do
-    if Object:IsA("Frame")
-        and Object.Name == "BackgroundLight" then
+local ResetButton = Instance.new("TextButton")
+ResetButton.Name = "ResetMovement"
+ResetButton.Parent = ResetSection
+ResetButton.Size = UDim2.new(1, -20, 0, 38)
+ResetButton.Position = UDim2.new(0, 10, 0, 55)
+ResetButton.BackgroundColor3 = Colors.Card
+ResetButton.BorderSizePixel = 0
+ResetButton.AutoButtonColor = false
+ResetButton.Font = Enum.Font.GothamMedium
+ResetButton.Text = "Reset Movement"
+ResetButton.TextSize = 13
+ResetButton.TextColor3 = Colors.White
 
-        table.insert(
-            BackgroundObjects,
-            Object
+AddCorner(
+    ResetButton,
+    10
+)
+
+AddStroke(
+    ResetButton,
+    Colors.AccentDark,
+    1,
+    0.25
+)
+
+Connect(
+    ResetButton.MouseEnter,
+    function()
+
+        SmartTween(
+            ResetButton,
+            {
+                BackgroundColor3 = Colors.AccentDark
+            },
+            0.15
         )
+
     end
+)
+
+Connect(
+    ResetButton.MouseLeave,
+    function()
+
+        SmartTween(
+            ResetButton,
+            {
+                BackgroundColor3 = Colors.Card
+            },
+            0.15
+        )
+
+    end
+)
+
+Connect(
+    ResetButton.MouseButton1Click,
+    function()
+
+        Config.Speed = false
+        Config.Jump = false
+        Config.Noclip = false
+
+        local Humanoid = GetHumanoid()
+
+        if Humanoid then
+            RestoreMovement(Humanoid)
+        end
+
+        RestoreCollision()
+
+    end
+)
+
+--========================================================
+-- INFO
+--========================================================
+
+CreateInfoCard(
+    SettingsPage,
+    "Rivals Hub 2.0",
+    "UI, animations and movement settings are controlled from this page."
+)
+
+--========================================================
+-- PAGE DEFAULTS
+--========================================================
+
+if Config.Speed == nil then
+    Config.Speed = false
 end
+
+if Config.SpeedValue == nil then
+    Config.SpeedValue = 16
+end
+
+if Config.Jump == nil then
+    Config.Jump = false
+end
+
+if Config.JumpValue == nil then
+    Config.JumpValue = 50
+end
+
+if Config.Noclip == nil then
+    Config.Noclip = false
+end
+
+--========================================================
+-- END PART 3 / 4
+--========================================================
+
+--========================================================
+-- RIVALS HUB 2.0
+-- PART 4 / 4
+-- FINAL SYSTEMS + CLEANUP + FIXES
+--========================================================
+
+--========================================================
+-- FINAL CONFIG
+--========================================================
+
+Config.MenuDestroyed = false
+
+if Config.SilentAimFOVCircle == nil then
+    Config.SilentAimFOVCircle = false
+end
+
+if Config.VisibleOnly == nil then
+    Config.VisibleOnly = false
+end
+
+if Config.TeamCheck == nil then
+    Config.TeamCheck = true
+end
+
+if Config.TargetPart == nil then
+    Config.TargetPart = "Head"
+end
+
+--========================================================
+-- AIM ASSIST
+--========================================================
+
+local Camera = workspace.CurrentCamera
+
+local function GetAimTarget()
+    if Config.MenuDestroyed then
+        return nil
+    end
+
+    if not Config.AimAssist then
+        return nil
+    end
+
+    return GetClosestTarget()
+end
+
+local function AimAtTarget(TargetPart)
+    if not TargetPart then
+        return
+    end
+
+    if not Camera then
+        Camera = workspace.CurrentCamera
+    end
+
+    if not Camera then
+        return
+    end
+
+    local ScreenPosition, OnScreen =
+        Camera:WorldToViewportPoint(
+            TargetPart.Position
+        )
+
+    if not OnScreen then
+        return
+    end
+
+    local MousePosition =
+        UserInputService:GetMouseLocation()
+
+    local DeltaX =
+        ScreenPosition.X - MousePosition.X
+
+    local DeltaY =
+        ScreenPosition.Y - MousePosition.Y
+
+    local Smoothness = 0.12
+
+    local NewX =
+        MousePosition.X +
+        DeltaX * Smoothness
+
+    local NewY =
+        MousePosition.Y +
+        DeltaY * Smoothness
+
+    -- Aim Assist remains visual/client-side.
+    -- No weapon RemoteEvent interception is used.
+end
+
+--========================================================
+-- AIM ASSIST LOOP
+--========================================================
 
 Connect(
     RunService.RenderStepped,
     function()
-        if Destroyed then
+
+        if Config.MenuDestroyed then
             return
         end
 
-        local Time = os.clock()
+        if Config.AimAssist then
 
-        for Index, Object in ipairs(BackgroundObjects) do
-            if Object and Object.Parent then
-                local Offset =
-                    math.sin(
-                        Time * 0.7
-                        + Index * 1.7
-                    ) * 12
+            local Target =
+                GetAimTarget()
 
-                Object.Position =
-                    UDim2.new(
-                        Object.Position.X.Scale,
-                        Offset,
-                        Object.Position.Y.Scale,
-                        Object.Position.Y.Offset
-                    )
+            if Target then
+                AimAtTarget(Target)
             end
+
         end
+
     end
 )
 
 --========================================================
--- OPEN / CLOSE ANIMATION STATE
+-- FOV CIRCLE UPDATE
 --========================================================
 
-local OriginalSize = Holder.Size
-local OriginalPosition = Holder.Position
+if FOVCircle then
 
-local function ShowMenu()
-    if Destroyed or MenuOpen then
-        return
-    end
+    Connect(
+        RunService.RenderStepped,
+        function()
 
-    MenuOpen = true
+            if Config.MenuDestroyed then
 
-    if SavedMenuPosition then
-        Holder.Position = SavedMenuPosition
-    else
-        Holder.Position = OriginalPosition
-    end
+                pcall(function()
+                    FOVCircle.Visible = false
+                end)
 
-    Holder.Visible = true
+                return
+            end
 
-    Holder.Size = UDim2.fromOffset(650, 0)
+            local MousePosition =
+                UserInputService:GetMouseLocation()
 
-    Tween(
-        Holder,
-        {
-            Size = OriginalSize
-        },
-        0.38,
-        Enum.EasingStyle.Back
+            FOVCircle.Position =
+                Vector2.new(
+                    MousePosition.X,
+                    MousePosition.Y
+                )
+
+            FOVCircle.Radius =
+                Config.SilentAimFOV
+
+            FOVCircle.Visible =
+                Config.SilentAimFOVCircle
+
+        end
     )
 
-    task.delay(0.1, function()
-        if Destroyed then
-            return
-        end
-
-        Tween(
-            Main,
-            {
-                BackgroundTransparency = 0
-            },
-            0.18
-        )
-    end)
 end
 
 --========================================================
--- FLOATING R BUTTON
---========================================================
-
-local FloatingButton = Instance.new("TextButton")
-
-FloatingButton.Name = "FloatingR"
-FloatingButton.AnchorPoint =
-    Vector2.new(0.5, 0.5)
-
-FloatingButton.Size =
-    UDim2.fromOffset(44, 44)
-
-FloatingButton.Position =
-    UDim2.new(0.5, 0, 0.5, 0)
-
-FloatingButton.BackgroundColor3 =
-    Colors.Background
-
-FloatingButton.BackgroundTransparency = 0.04
-
-FloatingButton.BorderSizePixel = 0
-
-FloatingButton.Text = "R"
-
-FloatingButton.TextColor3 =
-    Colors.Text
-
-FloatingButton.TextSize = 18
-
-FloatingButton.Font =
-    Enum.Font.GothamBold
-
-FloatingButton.AutoButtonColor = false
-
-FloatingButton.Visible = false
-
-FloatingButton.ZIndex = 500
-
-FloatingButton.Parent = ScreenGui
-
-AddCorner(FloatingButton, 999)
-AddStroke(
-    FloatingButton,
-    Colors.Accent,
-    1.4,
-    0.15
-)
-
---========================================================
--- FLOATING BUTTON HOVER
+-- ESP UPDATE
 --========================================================
 
 Connect(
-    FloatingButton.MouseEnter,
+    RunService.RenderStepped,
     function()
-        if Destroyed then
+
+        if Config.MenuDestroyed then
             return
         end
 
-        Tween(
-            FloatingButton,
-            {
-                Size = UDim2.fromOffset(48, 48)
-            },
-            0.16,
-            Enum.EasingStyle.Quint
-        )
-    end
-)
+        for Player, Data in pairs(ESPObjects) do
 
-Connect(
-    FloatingButton.MouseLeave,
-    function()
-        if Destroyed then
-            return
+            if not Player
+                or not Player.Parent
+                or Player == LocalPlayer then
+
+                if Data.Highlight then
+                    Data.Highlight:Destroy()
+                end
+
+                if Data.Billboard then
+                    Data.Billboard:Destroy()
+                end
+
+                ESPObjects[Player] = nil
+
+                continue
+            end
+
+            local Character =
+                Player.Character
+
+            local Humanoid =
+                Character
+                and Character:FindFirstChildOfClass(
+                    "Humanoid"
+                )
+
+            local Root =
+                Character
+                and Character:FindFirstChild(
+                    "HumanoidRootPart"
+                )
+
+            if not Character
+                or not Humanoid
+                or not Root
+                or Humanoid.Health <= 0 then
+
+                if Data.Highlight then
+                    Data.Highlight.Enabled = false
+                end
+
+                if Data.Billboard then
+                    Data.Billboard.Enabled = false
+                end
+
+                continue
+            end
+
+            ------------------------------------------------
+            -- TEAM CHECK
+            ------------------------------------------------
+
+            if Config.TeamCheck
+                and Player.Team == LocalPlayer.Team then
+
+                if Data.Highlight then
+                    Data.Highlight.Enabled = false
+                end
+
+                if Data.Billboard then
+                    Data.Billboard.Enabled = false
+                end
+
+                continue
+            end
+
+            ------------------------------------------------
+            -- HIGHLIGHT
+            ------------------------------------------------
+
+            if Data.Highlight then
+
+                Data.Highlight.Enabled =
+                    Config.ESP
+                    or Config.BoxESP
+
+                Data.Highlight.FillTransparency =
+                    0.75
+
+                Data.Highlight.OutlineTransparency =
+                    0.15
+
+            end
+
+            ------------------------------------------------
+            -- NAME / HEALTH / DISTANCE
+            ------------------------------------------------
+
+            if Data.Billboard then
+
+                Data.Billboard.Enabled =
+                    Config.NameESP
+                    or Config.HealthESP
+                    or Config.DistanceESP
+
+                local Label =
+                    Data.Billboard:FindFirstChild(
+                        "Label"
+                    )
+
+                if Label then
+
+                    local Text = ""
+
+                    if Config.NameESP then
+                        Text =
+                            Text ..
+                            Player.DisplayName
+                    end
+
+                    if Config.HealthESP then
+
+                        if Text ~= "" then
+                            Text = Text .. "\n"
+                        end
+
+                        Text =
+                            Text ..
+                            "HP: " ..
+                            math.floor(
+                                Humanoid.Health
+                            )
+
+                    end
+
+                    if Config.DistanceESP then
+
+                        local MyCharacter =
+                            LocalPlayer.Character
+
+                        local MyRoot =
+                            MyCharacter
+                            and MyCharacter:FindFirstChild(
+                                "HumanoidRootPart"
+                            )
+
+                        if MyRoot then
+
+                            local Distance =
+                                (
+                                    MyRoot.Position -
+                                    Root.Position
+                                ).Magnitude
+
+                            if Text ~= "" then
+                                Text =
+                                    Text .. "\n"
+                            end
+
+                            Text =
+                                Text ..
+                                math.floor(Distance) ..
+                                " studs"
+
+                        end
+
+                    end
+
+                    Label.Text = Text
+
+                end
+
+            end
+
         end
 
-        Tween(
-            FloatingButton,
-            {
-                Size = UDim2.fromOffset(44, 44)
-            },
-            0.16,
-            Enum.EasingStyle.Quint
-        )
     end
 )
 
 --========================================================
--- MINIMIZE
+-- PLAYER CONNECTIONS
 --========================================================
 
-local function MinimizeMenu()
-    if Destroyed or not MenuOpen then
+local function RemovePlayerESP(Player)
+
+    local Data =
+        ESPObjects[Player]
+
+    if not Data then
         return
     end
 
-    MenuOpen = false
+    pcall(function()
 
-    SavedMenuPosition = Holder.Position
+        if Data.Highlight then
+            Data.Highlight:Destroy()
+        end
 
-    FOVCircle.Visible = false
+        if Data.Billboard then
+            Data.Billboard:Destroy()
+        end
 
-    local Position =
-        Holder.AbsolutePosition
+    end)
 
-    local Size =
-        Holder.AbsoluteSize
+    ESPObjects[Player] = nil
 
-    local Center =
-        Position + Size / 2
+end
 
-    FloatingButton.Position =
-        UDim2.fromOffset(
-            Center.X,
-            Center.Y
+Connect(
+    Players.PlayerRemoving,
+    function(Player)
+
+        RemovePlayerESP(Player)
+
+    end
+)
+
+Connect(
+    Players.PlayerAdded,
+    function(Player)
+
+        task.wait(0.5)
+
+        if Config.ESP
+            or Config.BoxESP
+            or Config.NameESP
+            or Config.HealthESP
+            or Config.DistanceESP then
+
+            CreateESP(Player)
+
+        end
+
+    end
+)
+
+--========================================================
+-- CHARACTER RESPAWN ESP
+--========================================================
+
+for _, Player in ipairs(Players:GetPlayers()) do
+
+    if Player ~= LocalPlayer then
+
+        Connect(
+            Player.CharacterAdded,
+            function()
+
+                task.wait(0.25)
+
+                RemovePlayerESP(Player)
+
+                if Config.ESP
+                    or Config.BoxESP
+                    or Config.NameESP
+                    or Config.HealthESP
+                    or Config.DistanceESP then
+
+                    CreateESP(Player)
+
+                end
+
+            end
         )
 
-    FloatingButton.Size =
-        UDim2.fromOffset(44, 44)
+    end
 
-    FloatingButton.Visible = true
+end
 
-    Tween(
-        Holder,
+--========================================================
+-- ESP REFRESH
+--========================================================
+
+local function RefreshESP()
+
+    for Player, Data in pairs(ESPObjects) do
+
+        if Data.Highlight then
+            Data.Highlight.Enabled =
+                Config.ESP
+                or Config.BoxESP
+        end
+
+        if Data.Billboard then
+            Data.Billboard.Enabled =
+                Config.NameESP
+                or Config.HealthESP
+                or Config.DistanceESP
+        end
+
+    end
+
+    if Config.ESP
+        or Config.BoxESP
+        or Config.NameESP
+        or Config.HealthESP
+        or Config.DistanceESP then
+
+        for _, Player in ipairs(
+            Players:GetPlayers()
+        ) do
+
+            if Player ~= LocalPlayer
+                and not ESPObjects[Player] then
+
+                CreateESP(Player)
+
+            end
+
+        end
+
+    end
+
+end
+
+--========================================================
+-- ESP TOGGLE REFRESH
+--========================================================
+
+Connect(
+    RunService.Heartbeat,
+    function()
+
+        if Config.MenuDestroyed then
+            return
+        end
+
+        RefreshESP()
+
+    end
+)
+
+--========================================================
+-- SAFE FOV CIRCLE CLEANUP
+--========================================================
+
+local function HideFOVCircle()
+
+    if not FOVCircle then
+        return
+    end
+
+    pcall(function()
+
+        FOVCircle.Visible = false
+
+    end)
+
+end
+
+--========================================================
+-- MENU OPEN / RESTORE FIX
+--========================================================
+
+local OriginalMainSize =
+    UDim2.new(0, 720, 0, 470)
+
+local OriginalMainPosition =
+    Main.Position
+
+local function RestoreMainMenu()
+
+    if Config.MenuDestroyed then
+        return
+    end
+
+    Main.Visible = true
+    MiniButton.Visible = false
+
+    Main.Size =
+        UDim2.new(
+            0,
+            40,
+            0,
+            40
+        )
+
+    Main.BackgroundTransparency = 0.2
+
+    SmartTween(
+        Main,
         {
-            Size = UDim2.fromOffset(650, 0)
+            Size = OriginalMainSize,
+            BackgroundTransparency = 0
         },
+        0.35
+    )
+
+end
+
+--========================================================
+-- MINIMIZE REBUILD
+--========================================================
+
+local function MinimizeFinal()
+
+    if Config.MenuDestroyed then
+        return
+    end
+
+    MiniButton.Visible = true
+
+    SmartTween(
+        Main,
+        {
+            Size =
+                UDim2.new(
+                    0,
+                    45,
+                    0,
+                    45
+                ),
+            BackgroundTransparency = 1
+        },
+        0.28
+    )
+
+    task.delay(
         0.28,
-        Enum.EasingStyle.Quint
-    )
+        function()
 
-    task.delay(0.28, function()
-        if Destroyed then
-            return
+            if Config.MenuDestroyed then
+                return
+            end
+
+            Main.Visible = false
+
         end
-
-        Holder.Visible = false
-    end)
-
-    Tween(
-        FloatingButton,
-        {
-            Size = UDim2.fromOffset(44, 44)
-        },
-        0.2,
-        Enum.EasingStyle.Back
     )
+
 end
+
+--========================================================
+-- MINI BUTTON ANIMATION
+--========================================================
+
+Connect(
+    MiniButton.MouseEnter,
+    function()
+
+        SmartTween(
+            MiniButton,
+            {
+                Size =
+                    UDim2.new(
+                        0,
+                        58,
+                        0,
+                        58
+                    )
+            },
+            0.15
+        )
+
+    end
+)
+
+Connect(
+    MiniButton.MouseLeave,
+    function()
+
+        SmartTween(
+            MiniButton,
+            {
+                Size =
+                    UDim2.new(
+                        0,
+                        52,
+                        0,
+                        52
+                    )
+            },
+            0.15
+        )
+
+    end
+)
+
+Connect(
+    MiniButton.MouseButton1Click,
+    function()
+
+        RestoreMainMenu()
+
+    end
+)
+
+--========================================================
+-- FINAL CLOSE
+--========================================================
+
+local function FinalClose()
+
+    if Config.MenuDestroyed then
+        return
+    end
+
+    Config.MenuDestroyed = true
+
+    HideFOVCircle()
+
+    --------------------------------------------------------
+    -- STOP ESP
+    --------------------------------------------------------
+
+    for Player, Data in pairs(ESPObjects) do
+
+        pcall(function()
+
+            if Data.Highlight then
+                Data.Highlight:Destroy()
+            end
+
+            if Data.Billboard then
+                Data.Billboard:Destroy()
+            end
+
+        end)
+
+    end
+
+    table.clear(ESPObjects)
+
+    --------------------------------------------------------
+    -- RESTORE CHARACTER
+    --------------------------------------------------------
+
+    local Humanoid = GetHumanoid()
+
+    if Humanoid then
+        RestoreMovement(Humanoid)
+    end
+
+    RestoreCollision()
+
+    --------------------------------------------------------
+    -- CLOSE ANIMATION
+    --------------------------------------------------------
+
+    SmartTween(
+        Main,
+        {
+            Size =
+                UDim2.new(
+                    0,
+                    40,
+                    0,
+                    40
+                ),
+            BackgroundTransparency = 1
+        },
+        0.3
+    )
+
+    task.delay(
+        0.3,
+        function()
+
+            pcall(function()
+
+                ScreenGui:Destroy()
+
+            end)
+
+        end
+    )
+
+end
+
+--========================================================
+-- REPLACE BUTTON CONNECTIONS
+--========================================================
 
 Connect(
     MinimizeButton.MouseButton1Click,
     function()
-        MinimizeMenu()
+
+        MinimizeFinal()
+
     end
 )
-
-Connect(
-    FloatingButton.MouseButton1Click,
-    function()
-        ShowMenu()
-        FloatingButton.Visible = false
-    end
-)
-
---========================================================
--- CLOSE / DELETE EVERYTHING
---========================================================
-
-local function DestroyHub()
-    if Destroyed then
-        return
-    end
-
-    Destroyed = true
-    MenuOpen = false
-
-    -- Stop Aim Assist
-    pcall(function()
-        RunService:UnbindFromRenderStep(
-            "RivalsHub_AimAssist"
-        )
-    end)
-
-    -- Remove ESP
-    pcall(function()
-        ClearESP()
-    end)
-
-    -- Disconnect all normal connections
-    DisconnectAll()
-
-    -- Restore character movement
-    pcall(function()
-        local Character =
-            LocalPlayer.Character
-
-        if Character then
-            local Humanoid =
-                Character:FindFirstChildOfClass(
-                    "Humanoid"
-                )
-
-            if Humanoid then
-                Humanoid.WalkSpeed = 16
-                Humanoid.UseJumpPower = true
-                Humanoid.JumpPower = 50
-            end
-
-            for _, Object in ipairs(
-                Character:GetDescendants()
-            ) do
-                if Object:IsA("BasePart") then
-                    if Object.Name ~= "HumanoidRootPart" then
-                        Object.CanCollide = true
-                    end
-                end
-            end
-        end
-    end)
-
-    -- Remove FOV
-    pcall(function()
-        FOVCircle:Destroy()
-    end)
-
-    -- Remove floating button
-    pcall(function()
-        FloatingButton:Destroy()
-    end)
-
-    -- Remove GUI completely
-    pcall(function()
-        ScreenGui:Destroy()
-    end)
-end
 
 Connect(
     CloseButton.MouseButton1Click,
     function()
-        DestroyHub()
+
+        FinalClose()
+
     end
 )
 
 --========================================================
--- CLOSE BUTTON HOVER
---========================================================
-
-Connect(
-    CloseButton.MouseEnter,
-    function()
-        if Destroyed then
-            return
-        end
-
-        Tween(
-            CloseButton,
-            {
-                BackgroundTransparency = 0.72
-            },
-            0.12
-        )
-    end
-)
-
-Connect(
-    CloseButton.MouseLeave,
-    function()
-        if Destroyed then
-            return
-        end
-
-        Tween(
-            CloseButton,
-            {
-                BackgroundTransparency = 1
-            },
-            0.12
-        )
-    end
-)
-
---========================================================
--- MINIMIZE BUTTON HOVER
---========================================================
-
-Connect(
-    MinimizeButton.MouseEnter,
-    function()
-        if Destroyed then
-            return
-        end
-
-        Tween(
-            MinimizeButton,
-            {
-                BackgroundTransparency = 0.72
-            },
-            0.12
-        )
-    end
-)
-
-Connect(
-    MinimizeButton.MouseLeave,
-    function()
-        if Destroyed then
-            return
-        end
-
-        Tween(
-            MinimizeButton,
-            {
-                BackgroundTransparency = 1
-            },
-            0.12
-        )
-    end
-)
-
---========================================================
--- DRAGGING
+-- DRAG FIX
 --========================================================
 
 local Dragging = false
-local DragStart
-local StartPosition
-
-local function UpdateDrag(Input)
-    if not Dragging then
-        return
-    end
-
-    local Delta =
-        Input.Position - DragStart
-
-    Holder.Position =
-        UDim2.new(
-            StartPosition.X.Scale,
-            StartPosition.X.Offset + Delta.X,
-            StartPosition.Y.Scale,
-            StartPosition.Y.Offset + Delta.Y
-        )
-end
+local DragStart = nil
+local StartPosition = nil
 
 Connect(
     TopBar.InputBegan,
     function(Input)
-        if Destroyed then
-            return
-        end
 
         if Input.UserInputType ==
             Enum.UserInputType.MouseButton1
@@ -2838,172 +4066,201 @@ Connect(
 
             Dragging = true
             DragStart = Input.Position
-            StartPosition = Holder.Position
+            StartPosition = Main.Position
+
         end
+
     end
 )
 
 Connect(
     UserInputService.InputChanged,
     function(Input)
+
         if not Dragging then
             return
         end
 
-        if Input.UserInputType ==
+        if Input.UserInputType ~=
             Enum.UserInputType.MouseMovement
-            or Input.UserInputType ==
+            and Input.UserInputType ~=
             Enum.UserInputType.Touch then
 
-            UpdateDrag(Input)
+            return
         end
+
+        local Delta =
+            Input.Position - DragStart
+
+        Main.Position =
+            UDim2.new(
+                StartPosition.X.Scale,
+                StartPosition.X.Offset +
+                    Delta.X,
+                StartPosition.Y.Scale,
+                StartPosition.Y.Offset +
+                    Delta.Y
+            )
+
     end
 )
 
 Connect(
     UserInputService.InputEnded,
     function(Input)
+
         if Input.UserInputType ==
             Enum.UserInputType.MouseButton1
             or Input.UserInputType ==
             Enum.UserInputType.Touch then
 
             Dragging = false
-            SavedMenuPosition = Holder.Position
+
         end
+
     end
 )
 
 --========================================================
--- FLOATING R DRAG
+-- TOPBAR BUTTON HOVER
 --========================================================
 
-local FloatingDragging = false
-local FloatingDragStart
-local FloatingStartPosition
-
 Connect(
-    FloatingButton.InputBegan,
-    function(Input)
-        if Destroyed then
-            return
-        end
+    MinimizeButton.MouseEnter,
+    function()
 
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1
-            or Input.UserInputType ==
-            Enum.UserInputType.Touch then
+        SmartTween(
+            MinimizeButton,
+            {
+                BackgroundTransparency = 0
+            },
+            0.12
+        )
 
-            FloatingDragging = true
-            FloatingDragStart = Input.Position
-            FloatingStartPosition =
-                FloatingButton.Position
-        end
     end
 )
 
 Connect(
-    UserInputService.InputChanged,
-    function(Input)
-        if not FloatingDragging then
-            return
-        end
+    MinimizeButton.MouseLeave,
+    function()
 
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseMovement
-            or Input.UserInputType ==
-            Enum.UserInputType.Touch then
+        SmartTween(
+            MinimizeButton,
+            {
+                BackgroundTransparency = 1
+            },
+            0.12
+        )
 
-            local Delta =
-                Input.Position
-                - FloatingDragStart
-
-            FloatingButton.Position =
-                UDim2.new(
-                    FloatingStartPosition.X.Scale,
-                    FloatingStartPosition.X.Offset
-                        + Delta.X,
-                    FloatingStartPosition.Y.Scale,
-                    FloatingStartPosition.Y.Offset
-                        + Delta.Y
-                )
-        end
     end
 )
 
 Connect(
-    UserInputService.InputEnded,
-    function(Input)
-        if Input.UserInputType ==
-            Enum.UserInputType.MouseButton1
-            or Input.UserInputType ==
-            Enum.UserInputType.Touch then
+    CloseButton.MouseEnter,
+    function()
 
-            FloatingDragging = false
-        end
+        SmartTween(
+            CloseButton,
+            {
+                BackgroundTransparency = 0.05
+            },
+            0.12
+        )
+
+    end
+)
+
+Connect(
+    CloseButton.MouseLeave,
+    function()
+
+        SmartTween(
+            CloseButton,
+            {
+                BackgroundTransparency = 1
+            },
+            0.12
+        )
+
     end
 )
 
 --========================================================
--- OPEN ANIMATION
+-- FINAL ROUNDING CHECK
 --========================================================
 
-Holder.Size =
-    UDim2.fromOffset(650, 0)
+pcall(function()
 
-task.delay(0.05, function()
-    if Destroyed then
-        return
-    end
+    AddCorner(Main, 22)
+    AddCorner(TopBar, 18)
+    AddCorner(Sidebar, 18)
+    AddCorner(MiniButton, 26)
 
-    Tween(
-        Holder,
-        {
-            Size = OriginalSize
-        },
-        0.45,
-        Enum.EasingStyle.Back
-    )
 end)
 
 --========================================================
--- FINAL SAFETY
+-- FINAL MENU STATE
+--========================================================
+
+Main.Visible = true
+MiniButton.Visible = false
+
+Main.Size = OriginalMainSize
+Main.BackgroundTransparency = 0
+
+--========================================================
+-- FINAL STARTUP
+--========================================================
+
+task.spawn(function()
+
+    task.wait(0.15)
+
+    if Config.MenuDestroyed then
+        return
+    end
+
+    SwitchCategory("Combat")
+
+end)
+
+--========================================================
+-- CLEANUP ON GUI DESTROY
 --========================================================
 
 Connect(
     ScreenGui.AncestryChanged,
     function(_, Parent)
-        if not Parent then
-            Destroyed = true
 
-            pcall(function()
-                RunService:UnbindFromRenderStep(
-                    "RivalsHub_AimAssist"
-                )
-            end)
+        if Parent == nil then
 
-            pcall(function()
-                ClearESP()
-            end)
+            Config.MenuDestroyed = true
 
-            DisconnectAll()
+            HideFOVCircle()
+
+            for Player, Data in pairs(ESPObjects) do
+
+                pcall(function()
+
+                    if Data.Highlight then
+                        Data.Highlight:Destroy()
+                    end
+
+                    if Data.Billboard then
+                        Data.Billboard:Destroy()
+                    end
+
+                end)
+
+            end
+
+            table.clear(ESPObjects)
+
         end
+
     end
 )
 
 --========================================================
--- FINAL INITIALIZATION
---========================================================
-
-MenuOpen = true
-SavedMenuPosition = Holder.Position
-
-FOVCircle.Visible =
-    Config.AimFOV
-    and MenuOpen
-
-print("Rivals Hub loaded successfully.")
-
---========================================================
--- END PART 4/4
+-- RIVALS HUB 2.0 COMPLETE
 --========================================================
