@@ -4045,3 +4045,389 @@ end)
 --//====================================================//
 --// END OF RIVALS HUB 2.1
 --//====================================================//
+
+--==============================================================--
+-- FINAL MENU CONTROL BLOCK
+-- Paste this block at the VERY END of the script
+--==============================================================--
+
+local FinalScreenGui = ScreenGui
+local FinalHolder = Holder
+
+if not FinalScreenGui or not FinalHolder then
+    return
+end
+
+local FinalMini = FinalScreenGui:FindFirstChild("RivalsMiniButton")
+
+--==============================================================--
+-- CREATE MINI BUTTON
+--==============================================================--
+
+if not FinalMini then
+    FinalMini = Instance.new("TextButton")
+    FinalMini.Name = "RivalsMiniButton"
+    FinalMini.Size = UDim2.fromOffset(58, 58)
+    FinalMini.Position = FinalHolder.Position
+    FinalMini.AnchorPoint = Vector2.new(0.5, 0.5)
+    FinalMini.BackgroundColor3 = Config.AccentDark
+    FinalMini.BorderSizePixel = 0
+    FinalMini.Text = "R"
+    FinalMini.TextColor3 = Config.Text
+    FinalMini.TextSize = 22
+    FinalMini.Font = Enum.Font.GothamBold
+    FinalMini.AutoButtonColor = false
+    FinalMini.Visible = false
+    FinalMini.ZIndex = 100
+    FinalMini.Parent = FinalScreenGui
+
+    local MiniCorner = Instance.new("UICorner")
+    MiniCorner.CornerRadius = UDim.new(0, 16)
+    MiniCorner.Parent = FinalMini
+
+    local MiniStroke = Instance.new("UIStroke")
+    MiniStroke.Color = Config.Accent
+    MiniStroke.Thickness = 1
+    MiniStroke.Transparency = 0.15
+    MiniStroke.Parent = FinalMini
+end
+
+--==============================================================--
+-- STATE
+--==============================================================--
+
+local MenuClosed = false
+local MenuMinimized = false
+
+local SavedPosition = FinalHolder.Position
+
+--==============================================================--
+-- MINIMIZE
+--==============================================================--
+
+local function FinalMinimize()
+    if MenuClosed or MenuMinimized then
+        return
+    end
+
+    SavedPosition = FinalHolder.Position
+    MenuMinimized = true
+    Config.Open = false
+
+    FinalMini.Position = SavedPosition
+    FinalMini.Visible = true
+
+    -- Hide the actual menu after animation
+    if HolderScale then
+        Tween(HolderScale, {
+            Scale = 0.82
+        }, 0.18)
+    end
+
+    task.delay(0.16, function()
+        if MenuClosed or not MenuMinimized then
+            return
+        end
+
+        FinalHolder.Visible = false
+
+        if HolderScale then
+            HolderScale.Scale = 1
+        end
+    end)
+
+    Tween(FinalMini, {
+        Size = UDim2.fromOffset(64, 64)
+    }, 0.18)
+
+    task.delay(0.18, function()
+        if FinalMini and FinalMini.Parent then
+            Tween(FinalMini, {
+                Size = UDim2.fromOffset(58, 58)
+            }, 0.12)
+        end
+    end)
+end
+
+--==============================================================--
+-- RESTORE
+--==============================================================--
+
+local function FinalRestore()
+    if MenuClosed or not MenuMinimized then
+        return
+    end
+
+    MenuMinimized = false
+    Config.Open = true
+
+    FinalHolder.Position = FinalMini.Position
+    FinalHolder.Visible = true
+
+    if HolderScale then
+        HolderScale.Scale = 0.82
+    end
+
+    FinalMini.Visible = false
+
+    Tween(HolderScale, {
+        Scale = 1
+    }, 0.22)
+end
+
+--==============================================================--
+-- CLOSE / DESTROY
+--==============================================================--
+
+local function FinalClose()
+    if MenuClosed then
+        return
+    end
+
+    MenuClosed = true
+    Config.Destroyed = true
+    Config.Open = false
+
+    -- Stop mini button immediately
+    if FinalMini then
+        FinalMini.Visible = false
+        FinalMini.Active = false
+    end
+
+    -- Animate menu out
+    if FinalHolder and FinalHolder.Parent then
+        Tween(FinalHolder, {
+            Position = UDim2.new(
+                FinalHolder.Position.X.Scale,
+                FinalHolder.Position.X.Offset,
+                FinalHolder.Position.Y.Scale,
+                FinalHolder.Position.Y.Offset + 35
+            )
+        }, 0.18)
+
+        if HolderScale then
+            Tween(HolderScale, {
+                Scale = 0.88
+            }, 0.18)
+        end
+    end
+
+    task.delay(0.2, function()
+        if FinalScreenGui and FinalScreenGui.Parent then
+            FinalScreenGui:Destroy()
+        end
+    end)
+end
+
+--==============================================================--
+-- CLOSE BUTTON
+--==============================================================--
+
+if CloseButton then
+    CloseButton.MouseButton1Click:Connect(function()
+        if not MenuClosed then
+            FinalClose()
+        end
+    end)
+
+    CloseButton.MouseEnter:Connect(function()
+        if MenuClosed then return end
+
+        Tween(CloseButton, {
+            BackgroundColor3 = Color3.fromRGB(120, 40, 55)
+        }, 0.12)
+
+        Tween(CloseButton, {
+            TextColor3 = Color3.fromRGB(255, 255, 255)
+        }, 0.12)
+    end)
+
+    CloseButton.MouseLeave:Connect(function()
+        if MenuClosed then return end
+
+        Tween(CloseButton, {
+            BackgroundColor3 = Config.Panel2,
+            TextColor3 = Config.SubText
+        }, 0.12)
+    end)
+end
+
+--==============================================================--
+-- MINIMIZE BUTTON
+--==============================================================--
+
+if MinButton then
+    MinButton.MouseButton1Click:Connect(function()
+        if not MenuClosed and not MenuMinimized then
+            FinalMinimize()
+        end
+    end)
+end
+
+--==============================================================--
+-- MINI BUTTON DRAG
+--==============================================================--
+
+local MiniDragging = false
+local MiniDragged = false
+local MiniStartMouse
+local MiniStartPosition
+
+FinalMini.InputBegan:Connect(function(input)
+    if MenuClosed then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        MiniDragging = true
+        MiniDragged = false
+
+        MiniStartMouse = input.Position
+        MiniStartPosition = FinalMini.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                MiniDragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not MiniDragging or MenuClosed then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta = input.Position - MiniStartMouse
+
+        if math.abs(delta.X) > 5 or math.abs(delta.Y) > 5 then
+            MiniDragged = true
+        end
+
+        FinalMini.Position = UDim2.new(
+            MiniStartPosition.X.Scale,
+            MiniStartPosition.X.Offset + delta.X,
+            MiniStartPosition.Y.Scale,
+            MiniStartPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+FinalMini.MouseButton1Click:Connect(function()
+    if MenuClosed then
+        return
+    end
+
+    -- Prevent dragging from triggering restore
+    if MiniDragged then
+        MiniDragged = false
+        return
+    end
+
+    FinalRestore()
+end)
+
+--==============================================================--
+-- RIGHT SHIFT
+--==============================================================--
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed or MenuClosed then
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        if MenuMinimized then
+            FinalRestore()
+        else
+            FinalMinimize()
+        end
+    end
+end)
+
+--==============================================================--
+-- MENU DRAG
+--==============================================================--
+
+local MenuDragging = false
+local MenuStartMouse
+local MenuStartPosition
+
+if TopBar then
+    TopBar.InputBegan:Connect(function(input)
+        if MenuClosed or MenuMinimized then
+            return
+        end
+
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+            or input.UserInputType == Enum.UserInputType.Touch then
+
+            MenuDragging = true
+            MenuStartMouse = input.Position
+            MenuStartPosition = FinalHolder.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    MenuDragging = false
+                    SavedPosition = FinalHolder.Position
+                end
+            end)
+        end
+    end)
+end
+
+UserInputService.InputChanged:Connect(function(input)
+    if not MenuDragging or MenuClosed or MenuMinimized then
+        return
+    end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta = input.Position - MenuStartMouse
+
+        FinalHolder.Position = UDim2.new(
+            MenuStartPosition.X.Scale,
+            MenuStartPosition.X.Offset + delta.X,
+            MenuStartPosition.Y.Scale,
+            MenuStartPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+--==============================================================--
+-- FINAL SAFETY
+--==============================================================--
+
+FinalScreenGui.AncestryChanged:Connect(function(_, parent)
+    if not parent then
+        MenuClosed = true
+        Config.Destroyed = true
+    end
+end)
+
+--==============================================================--
+-- STARTUP
+--==============================================================--
+
+FinalHolder.Visible = true
+FinalMini.Visible = false
+
+if HolderScale then
+    HolderScale.Scale = 0.92
+
+    task.defer(function()
+        if not MenuClosed then
+            Tween(HolderScale, {
+                Scale = 1
+            }, 0.28)
+        end
+    end)
+end
+
+print("RIVALS HUB loaded successfully")
