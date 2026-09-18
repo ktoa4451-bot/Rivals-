@@ -3506,3 +3506,95 @@ end)
 --========================================================--
 -- END OF RIVALS HUB
 --========================================================--
+
+--========================================================--
+-- EMERGENCY MENU CONTROLS
+--========================================================--
+
+task.defer(function()
+    if not ScreenGui or not ScreenGui.Parent then
+        return
+    end
+
+    local Menu = ScreenGui:FindFirstChild("Holder")
+
+    if not Menu then
+        return
+    end
+
+    local Top = Menu:FindFirstChild("TopBar")
+
+    if not Top then
+        return
+    end
+
+    local MainFrame = Menu:FindFirstChild("Main")
+
+    -- MINIMIZE
+    local MinButton =
+        Top:FindFirstChild("MinimizeButton")
+
+    if MinButton and MinButton:IsA("TextButton") then
+        MinButton.MouseButton1Click:Connect(function()
+            if MainFrame then
+                MainFrame.Visible = false
+            end
+
+            Top.Visible = false
+
+            Menu.Visible = false
+
+            local Mini = ScreenGui:FindFirstChild("EmergencyR")
+
+            if not Mini then
+                Mini = Instance.new("TextButton")
+                Mini.Name = "EmergencyR"
+                Mini.Size = UDim2.fromOffset(54, 54)
+                Mini.Position = Menu.Position
+                Mini.AnchorPoint = Vector2.new(0.5, 0.5)
+                Mini.Text = "R"
+                Mini.TextSize = 24
+                Mini.Font = Enum.Font.GothamBlack
+                Mini.TextColor3 = Color3.fromRGB(245,245,250)
+                Mini.BackgroundColor3 = Color3.fromRGB(18,18,28)
+                Mini.Parent = ScreenGui
+
+                local Corner = Instance.new("UICorner")
+                Corner.CornerRadius = UDim.new(0,16)
+                Corner.Parent = Mini
+
+                local Stroke = Instance.new("UIStroke")
+                Stroke.Color = Color3.fromRGB(150,85,255)
+                Stroke.Thickness = 1.5
+                Stroke.Parent = Mini
+            end
+
+            Mini.Visible = true
+
+            Mini.MouseButton1Click:Connect(function()
+                Mini.Visible = false
+                Menu.Visible = true
+
+                if MainFrame then
+                    MainFrame.Visible = true
+                end
+
+                Top.Visible = true
+            end)
+        end)
+    end
+
+    -- CLOSE
+    local CloseButton =
+        Top:FindFirstChild("CloseButton")
+
+    if CloseButton and CloseButton:IsA("TextButton") then
+        CloseButton.MouseButton1Click:Connect(function()
+            ScreenGui:Destroy()
+        end)
+    end
+end)
+
+--========================================================--
+-- END EMERGENCY CONTROLS
+--========================================================--
