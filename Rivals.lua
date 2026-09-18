@@ -1,13 +1,8 @@
---// ============================================================
---// RIVALS HUB
---// CLEAN BUILD
---// PART 1A/3
---// FIXED CORE
---// ============================================================
-
---// ============================================================
---// SERVICES
---// ============================================================
+--//====================================================//
+--//                 RIVALS HUB 2.1                    //
+--//                    PART 1A/3                      //
+--//              SERVICES / CONFIG / HELPERS          //
+--//====================================================//
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -16,19 +11,18 @@ local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 
---// ============================================================
---// CONFIG
---// ============================================================
+--//====================================================//
+--//                    CONFIG                         //
+--//====================================================//
 
 local Config = {
-
-    --// Interface
+    -- UI
     AnimationTime = 0.35,
     Animations = true,
     BackgroundEffects = true,
     ShowStatus = true,
 
-    --// Colors
+    -- Colors
     Background = Color3.fromRGB(8, 8, 14),
     Panel = Color3.fromRGB(12, 12, 20),
     Panel2 = Color3.fromRGB(18, 18, 28),
@@ -36,14 +30,14 @@ local Config = {
     Text = Color3.fromRGB(245, 245, 250),
     Muted = Color3.fromRGB(145, 145, 160),
 
-    --// Combat
+    -- Combat
     AimAssist = false,
     TeamCheck = true,
     VisibleOnly = false,
     TargetPart = "Head",
     AimFOV = 150,
 
-    --// Visuals
+    -- Visuals
     ESP = false,
     ESPNames = true,
     ESPDistance = true,
@@ -53,7 +47,7 @@ local Config = {
     FOVSize = 150,
     FOVThickness = 2,
 
-    --// Movement
+    -- Movement
     SpeedEnabled = false,
     Speed = 18,
     JumpEnabled = false,
@@ -62,17 +56,13 @@ local Config = {
     Noclip = false,
     AutoSprint = false,
 
-    --// Runtime
+    -- Runtime
     Destroyed = false
 }
 
---// ============================================================
---// COMPATIBILITY CONFIG
---// Allows both:
---// Config.Accent
---// and:
---// Config.Colors.Accent
---// ============================================================
+--//====================================================//
+--//             COMPATIBILITY CONFIG TABLES            //
+--//====================================================//
 
 local function MakeProxy(Keys)
     local Proxy = {}
@@ -141,257 +131,38 @@ Config.Runtime = MakeProxy({
     Destroyed = true
 })
 
---// ============================================================
---// REMOVE OLD HUB
---// ============================================================
+--//====================================================//
+--//                  NEW INSTANCE                      //
+--//====================================================//
 
-pcall(function()
-
-    local CoreGui =
-        game:GetService("CoreGui")
-
-    local Old =
-        CoreGui:FindFirstChild("RivalsHub")
-
-    if Old then
-        Old:Destroy()
-    end
-end)
-
---// ============================================================
---// CORNER
---// ============================================================
-
-local function AddCorner(Object, Radius)
-
-    local Corner =
-        Instance.new("UICorner")
-
-    Corner.CornerRadius =
-        UDim.new(
-            0,
-            Radius or 8
-        )
-
-    Corner.Parent =
-        Object
-
-    return Corner
-end
-
---// ============================================================
---// STROKE
---// ============================================================
-
-local function AddStroke(
-    Object,
-    Color,
-    Thickness,
-    Transparency
-)
-
-    local Stroke =
-        Instance.new("UIStroke")
-
-    Stroke.Color =
-        Color or Config.Accent
-
-    Stroke.Thickness =
-        Thickness or 1
-
-    Stroke.Transparency =
-        Transparency or 0
-
-    Stroke.ApplyStrokeMode =
-        Enum.ApplyStrokeMode.Border
-
-    Stroke.Parent =
-        Object
-
-    return Stroke
-end
-
---// ============================================================
---// PADDING
---// ============================================================
-
-local function AddPadding(
-    Object,
-    Left,
-    Right,
-    Top,
-    Bottom
-)
-
-    local Padding =
-        Instance.new("UIPadding")
-
-    Padding.PaddingLeft =
-        UDim.new(
-            0,
-            Left or 0
-        )
-
-    Padding.PaddingRight =
-        UDim.new(
-            0,
-            Right or 0
-        )
-
-    Padding.PaddingTop =
-        UDim.new(
-            0,
-            Top or 0
-        )
-
-    Padding.PaddingBottom =
-        UDim.new(
-            0,
-            Bottom or 0
-        )
-
-    Padding.Parent =
-        Object
-
-    return Padding
-end
-
---// ============================================================
---// FIXED TWEEN
---//
---// Supports BOTH:
---//
---// Tween(Object, Time, Properties)
---// Tween(Object, Properties, Time)
---//
---// ============================================================
-
-local function Tween(
-    Object,
-    A,
-    B,
-    C,
-    D
-)
-
-    local Time
-    local Properties
-    local Style
-    local Direction
-
-    if typeof(A) == "table" then
-
-        -- New format:
-        -- Tween(Object, Properties, Time)
-
-        Properties = A
-        Time = B
-        Style = C
-        Direction = D
-
-    else
-
-        -- Old format:
-        -- Tween(Object, Time, Properties)
-
-        Time = A
-        Properties = B
-        Style = C
-        Direction = D
-    end
-
-    if not Object or not Object.Parent then
-        return nil
-    end
-
-    if not Properties then
-        return nil
-    end
-
-    if not Config.Animations then
-
-        for Property, Value in pairs(Properties) do
-            pcall(function()
-                Object[Property] = Value
-            end)
-        end
-
-        return nil
-    end
-
-    local Info =
-        TweenInfo.new(
-            Time or Config.AnimationTime,
-            Style or Enum.EasingStyle.Quint,
-            Direction or Enum.EasingDirection.Out
-        )
-
-    local Animation =
-        TweenService:Create(
-            Object,
-            Info,
-            Properties
-        )
-
-    Animation:Play()
-
-    return Animation
-end
-
---// ============================================================
---// FIXED NEW
---//
---// Supports BOTH:
---//
---// New("Frame", Parent, Properties)
---// New("Frame", Properties)
---//
---// ============================================================
-
-local function New(
-    ClassName,
-    A,
-    B
-)
-
+local function New(ClassName, A, B)
     local Parent
     local Properties
 
+    -- Format:
+    -- New("Frame", Parent, {...})
     if typeof(A) == "Instance" then
-
-        -- Old format:
-        -- New(Class, Parent, Properties)
-
         Parent = A
         Properties = B
 
+    -- Format:
+    -- New("Frame", {...})
     elseif typeof(A) == "table" then
-
-        -- New format:
-        -- New(Class, Properties)
-
         Properties = A
         Parent = Properties.Parent
 
     else
-
         Parent = A
         Properties = B
     end
 
-    local Object =
-        Instance.new(ClassName)
+    local Object = Instance.new(ClassName)
 
-    for Property, Value in pairs(
-        Properties or {}
-    ) do
-
+    for Property, Value in pairs(Properties or {}) do
         if Property ~= "Parent" then
-
             pcall(function()
                 Object[Property] = Value
             end)
-
         end
     end
 
@@ -402,76 +173,370 @@ local function New(
     return Object
 end
 
---// ============================================================
---// LABEL
---//
---// Supports the current Rivals Hub calls.
---// ============================================================
+--//====================================================//
+--//                     TWEEN                         //
+--//====================================================//
+
+local function Tween(Object, A, B, C, D)
+    if not Object then
+        return nil
+    end
+
+    local Time
+    local Properties
+    local Style
+    local Direction
+
+    -- Format:
+    -- Tween(Object, Properties, Time, Style, Direction)
+    if typeof(A) == "table" then
+        Properties = A
+        Time = B
+        Style = C
+        Direction = D
+
+    -- Format:
+    -- Tween(Object, Time, Properties, Style, Direction)
+    else
+        Time = A
+        Properties = B
+        Style = C
+        Direction = D
+    end
+
+    if not Object.Parent then
+        return nil
+    end
+
+    if not Properties then
+        return nil
+    end
+
+    -- Animations disabled
+    if Config.Animations == false then
+        for Property, Value in pairs(Properties) do
+            pcall(function()
+                Object[Property] = Value
+            end)
+        end
+
+        return nil
+    end
+
+    local Info = TweenInfo.new(
+        Time or Config.AnimationTime or 0.35,
+        Style or Enum.EasingStyle.Quint,
+        Direction or Enum.EasingDirection.Out
+    )
+
+    local Animation = TweenService:Create(
+        Object,
+        Info,
+        Properties
+    )
+
+    Animation:Play()
+
+    return Animation
+end
+
+--//====================================================//
+--//                    CORNER                        //
+--//====================================================//
+
+local function Corner(Parent, Radius)
+    return New(
+        "UICorner",
+        Parent,
+        {
+            CornerRadius = UDim.new(
+                0,
+                Radius or 10
+            )
+        }
+    )
+end
+
+--//====================================================//
+--//                    STROKE                        //
+--//====================================================//
+
+local function Stroke(Parent, Color, Thickness, Transparency)
+    return New(
+        "UIStroke",
+        Parent,
+        {
+            Color = Color or Config.Accent,
+            Thickness = Thickness or 1,
+            Transparency = Transparency or 0,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        }
+    )
+end
+
+--//====================================================//
+--//                     LABEL                         //
+--//====================================================//
+-- Supports BOTH formats:
+--
+-- Label(Parent, Text, Size, Position, TextSize, Color, Font)
+--
+-- and
+--
+-- Label(Parent, Text, Size, Position, Color, Font, TextSize)
+--
+-- This fixes the invisible / "-" text problem.
 
 local function Label(
     Parent,
     Text,
     Size,
     Position,
-    TextSize,
-    Color,
-    Font
+    A,
+    B,
+    C
 )
+    local TextSize
+    local Color
+    local Font
 
-    local Object =
-        New(
-            "TextLabel",
-            Parent,
-            {
-                Size =
-                    Size
-                    or UDim2.fromScale(
-                        1,
-                        1
-                    ),
+    -- Format:
+    -- TextSize, Color, Font
+    if typeof(A) == "number" then
+        TextSize = A
+        Color = B or Config.Text
+        Font = C or Enum.Font.GothamSemibold
 
-                Position =
-                    Position
-                    or UDim2.fromOffset(
-                        0,
-                        0
-                    ),
+    -- Format:
+    -- Color, Font, TextSize
+    elseif typeof(A) == "Color3" then
+        Color = A
+        Font = B or Enum.Font.GothamSemibold
+        TextSize = C or 11
 
-                BackgroundTransparency = 1,
+    else
+        TextSize = 11
+        Color = Config.Text
+        Font = Enum.Font.GothamSemibold
+    end
 
-                Text =
-                    Text or "",
+    local Object = New(
+        "TextLabel",
+        Parent,
+        {
+            Size = Size or UDim2.fromScale(1, 1),
 
-                TextColor3 =
-                    Color
-                    or Config.Text,
+            Position = Position or UDim2.fromOffset(0, 0),
 
-                TextSize =
-                    TextSize
-                    or 11,
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
 
-                Font =
-                    Font
-                    or Enum.Font.GothamSemibold,
+            Text = tostring(Text or ""),
 
-                TextXAlignment =
-                    Enum.TextXAlignment.Left,
+            TextColor3 = Color,
+            TextSize = TextSize,
 
-                TextYAlignment =
-                    Enum.TextYAlignment.Center,
+            Font = Font,
 
-                BorderSizePixel = 0,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
 
-                ZIndex = 10
-            }
-        )
+            TextWrapped = false,
+            TextScaled = false,
+
+            RichText = false,
+
+            ZIndex = 20
+        }
+    )
 
     return Object
 end
 
---// ============================================================
---// END PART 1A/3
---// ============================================================
+--//====================================================//
+--//                  TEXT BUTTON                      //
+--////====================================================//
+
+local function TextButton(
+    Parent,
+    Text,
+    Size,
+    Position,
+    TextSize,
+    Color
+)
+    local Button = New(
+        "TextButton",
+        Parent,
+        {
+            Size = Size or UDim2.fromOffset(100, 30),
+
+            Position = Position or UDim2.fromOffset(0, 0),
+
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+
+            Text = tostring(Text or ""),
+
+            TextColor3 = Color or Config.Text,
+            TextSize = TextSize or 11,
+
+            Font = Enum.Font.GothamSemibold,
+
+            AutoButtonColor = false,
+
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+
+            ZIndex = 30
+        }
+    )
+
+    return Button
+end
+
+--//====================================================//
+--//                    FRAME                         //
+--//====================================================//
+
+local function Frame(
+    Parent,
+    Size,
+    Position,
+    Color,
+    Transparency
+)
+    local Object = New(
+        "Frame",
+        Parent,
+        {
+            Size = Size or UDim2.fromScale(1, 1),
+
+            Position = Position or UDim2.fromOffset(0, 0),
+
+            BackgroundColor3 = Color or Config.Panel,
+
+            BackgroundTransparency = Transparency or 0,
+
+            BorderSizePixel = 0,
+
+            ZIndex = 1
+        }
+    )
+
+    return Object
+end
+
+--//====================================================//
+--//                 SCROLLING PAGE                    //
+--//====================================================//
+
+local function ScrollingPage(Parent)
+    local Page = New(
+        "ScrollingFrame",
+        Parent,
+        {
+            Size = UDim2.fromScale(1, 1),
+
+            BackgroundTransparency = 1,
+            BorderSizePixel = 0,
+
+            ScrollBarThickness = 3,
+            ScrollBarImageColor3 = Config.Accent,
+            ScrollBarImageTransparency = 0.35,
+
+            CanvasSize = UDim2.new(0, 0, 0, 0),
+
+            AutomaticCanvasSize = Enum.AutomaticSize.Y,
+
+            ScrollingDirection = Enum.ScrollingDirection.Y,
+
+            Active = true,
+
+            ZIndex = 10
+        }
+    )
+
+    New(
+        "UIPadding",
+        Page,
+        {
+            PaddingTop = UDim.new(0, 6),
+            PaddingBottom = UDim.new(0, 10),
+            PaddingLeft = UDim.new(0, 6),
+            PaddingRight = UDim.new(0, 6)
+        }
+    )
+
+    New(
+        "UIListLayout",
+        Page,
+        {
+            Padding = UDim.new(0, 8),
+
+            SortOrder = Enum.SortOrder.LayoutOrder,
+
+            HorizontalAlignment = Enum.HorizontalAlignment.Left
+        }
+    )
+
+    return Page
+end
+
+--//====================================================//
+--//                SAFE CONNECTION                    //
+--//====================================================//
+
+local Connections = {}
+
+local function Connect(Signal, Callback)
+    if not Signal or not Callback then
+        return nil
+    end
+
+    local Connection = Signal:Connect(function(...)
+        if Config.Destroyed then
+            return
+        end
+
+        local Success, Error = pcall(
+            Callback,
+            ...
+        )
+
+        if not Success then
+            warn(
+                "[RIVALS HUB] Callback error:",
+                Error
+            )
+        end
+    end)
+
+    table.insert(
+        Connections,
+        Connection
+    )
+
+    return Connection
+end
+
+--//====================================================//
+--//                 CLEANUP HELPER                    //
+--//====================================================//
+
+local function DisconnectAll()
+    for _, Connection in ipairs(Connections) do
+        pcall(function()
+            Connection:Disconnect()
+        end)
+    end
+
+    table.clear(Connections)
+end
+
+--//====================================================//
+--//               END OF PART 1A/3                   //
+--////====================================================//
 
 --// ============================================================
 --// SCREEN GUI
