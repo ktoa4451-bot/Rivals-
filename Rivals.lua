@@ -2,6 +2,7 @@
 --// RIVALS HUB
 --// CLEAN BUILD
 --// PART 1A/3
+--// FIXED CORE
 --// ============================================================
 
 --// ============================================================
@@ -24,52 +25,21 @@ local Config = {
     --// Interface
     AnimationTime = 0.35,
     Animations = true,
-
     BackgroundEffects = true,
     ShowStatus = true,
 
     --// Colors
-    Background = Color3.fromRGB(
-        8,
-        8,
-        14
-    ),
-
-    Panel = Color3.fromRGB(
-        12,
-        12,
-        20
-    ),
-
-    Panel2 = Color3.fromRGB(
-        18,
-        18,
-        28
-    ),
-
-    Accent = Color3.fromRGB(
-        150,
-        85,
-        255
-    ),
-
-    Text = Color3.fromRGB(
-        245,
-        245,
-        250
-    ),
-
-    Muted = Color3.fromRGB(
-        145,
-        145,
-        160
-    ),
+    Background = Color3.fromRGB(8, 8, 14),
+    Panel = Color3.fromRGB(12, 12, 20),
+    Panel2 = Color3.fromRGB(18, 18, 28),
+    Accent = Color3.fromRGB(150, 85, 255),
+    Text = Color3.fromRGB(245, 245, 250),
+    Muted = Color3.fromRGB(145, 145, 160),
 
     --// Combat
     AimAssist = false,
     TeamCheck = true,
     VisibleOnly = false,
-
     TargetPart = "Head",
     AimFOV = 150,
 
@@ -78,9 +48,7 @@ local Config = {
     ESPNames = true,
     ESPDistance = true,
     ESPHealth = true,
-
     VisualTeamCheck = true,
-
     FOVCircle = false,
     FOVSize = 150,
     FOVThickness = 2,
@@ -88,10 +56,8 @@ local Config = {
     --// Movement
     SpeedEnabled = false,
     Speed = 18,
-
     JumpEnabled = false,
     Jump = 50,
-
     InfiniteJump = false,
     Noclip = false,
     AutoSprint = false,
@@ -101,15 +67,91 @@ local Config = {
 }
 
 --// ============================================================
+--// COMPATIBILITY CONFIG
+--// Allows both:
+--// Config.Accent
+--// and:
+--// Config.Colors.Accent
+--// ============================================================
+
+local function MakeProxy(Keys)
+    local Proxy = {}
+
+    setmetatable(Proxy, {
+        __index = function(_, Key)
+            return Config[Key]
+        end,
+
+        __newindex = function(_, Key, Value)
+            if Keys[Key] then
+                Config[Key] = Value
+            end
+        end
+    })
+
+    return Proxy
+end
+
+Config.UI = MakeProxy({
+    AnimationTime = true,
+    Animations = true,
+    BackgroundEffects = true,
+    ShowStatus = true
+})
+
+Config.Colors = MakeProxy({
+    Background = true,
+    Panel = true,
+    Panel2 = true,
+    Accent = true,
+    Text = true,
+    Muted = true
+})
+
+Config.Combat = MakeProxy({
+    AimAssist = true,
+    TeamCheck = true,
+    VisibleOnly = true,
+    TargetPart = true,
+    AimFOV = true
+})
+
+Config.Visuals = MakeProxy({
+    ESP = true,
+    ESPNames = true,
+    ESPDistance = true,
+    ESPHealth = true,
+    VisualTeamCheck = true,
+    FOVCircle = true,
+    FOVSize = true,
+    FOVThickness = true
+})
+
+Config.Movement = MakeProxy({
+    SpeedEnabled = true,
+    Speed = true,
+    JumpEnabled = true,
+    Jump = true,
+    InfiniteJump = true,
+    Noclip = true,
+    AutoSprint = true
+})
+
+Config.Runtime = MakeProxy({
+    Destroyed = true
+})
+
+--// ============================================================
 --// REMOVE OLD HUB
 --// ============================================================
 
 pcall(function()
 
+    local CoreGui =
+        game:GetService("CoreGui")
+
     local Old =
-        game:GetService("CoreGui"):FindFirstChild(
-            "RivalsHub"
-        )
+        CoreGui:FindFirstChild("RivalsHub")
 
     if Old then
         Old:Destroy()
@@ -117,7 +159,7 @@ pcall(function()
 end)
 
 --// ============================================================
---// HELPER FUNCTIONS
+--// CORNER
 --// ============================================================
 
 local function AddCorner(Object, Radius)
@@ -128,13 +170,18 @@ local function AddCorner(Object, Radius)
     Corner.CornerRadius =
         UDim.new(
             0,
-            Radius
+            Radius or 8
         )
 
-    Corner.Parent = Object
+    Corner.Parent =
+        Object
 
     return Corner
 end
+
+--// ============================================================
+--// STROKE
+--// ============================================================
 
 local function AddStroke(
     Object,
@@ -163,6 +210,10 @@ local function AddStroke(
 
     return Stroke
 end
+
+--// ============================================================
+--// PADDING
+--// ============================================================
 
 local function AddPadding(
     Object,
@@ -205,21 +256,64 @@ local function AddPadding(
     return Padding
 end
 
+--// ============================================================
+--// FIXED TWEEN
+--//
+--// Supports BOTH:
+--//
+--// Tween(Object, Time, Properties)
+--// Tween(Object, Properties, Time)
+--//
+--// ============================================================
+
 local function Tween(
     Object,
-    Time,
-    Properties,
-    Style,
-    Direction
+    A,
+    B,
+    C,
+    D
 )
+
+    local Time
+    local Properties
+    local Style
+    local Direction
+
+    if typeof(A) == "table" then
+
+        -- New format:
+        -- Tween(Object, Properties, Time)
+
+        Properties = A
+        Time = B
+        Style = C
+        Direction = D
+
+    else
+
+        -- Old format:
+        -- Tween(Object, Time, Properties)
+
+        Time = A
+        Properties = B
+        Style = C
+        Direction = D
+    end
+
+    if not Object or not Object.Parent then
+        return nil
+    end
+
+    if not Properties then
+        return nil
+    end
 
     if not Config.Animations then
 
-        for Property, Value in pairs(
-            Properties
-        ) do
-
-            Object[Property] = Value
+        for Property, Value in pairs(Properties) do
+            pcall(function()
+                Object[Property] = Value
+            end)
         end
 
         return nil
@@ -244,11 +338,46 @@ local function Tween(
     return Animation
 end
 
+--// ============================================================
+--// FIXED NEW
+--//
+--// Supports BOTH:
+--//
+--// New("Frame", Parent, Properties)
+--// New("Frame", Properties)
+--//
+--// ============================================================
+
 local function New(
     ClassName,
-    Parent,
-    Properties
+    A,
+    B
 )
+
+    local Parent
+    local Properties
+
+    if typeof(A) == "Instance" then
+
+        -- Old format:
+        -- New(Class, Parent, Properties)
+
+        Parent = A
+        Properties = B
+
+    elseif typeof(A) == "table" then
+
+        -- New format:
+        -- New(Class, Properties)
+
+        Properties = A
+        Parent = Properties.Parent
+
+    else
+
+        Parent = A
+        Properties = B
+    end
 
     local Object =
         Instance.new(ClassName)
@@ -257,16 +386,27 @@ local function New(
         Properties or {}
     ) do
 
-        pcall(function()
-            Object[Property] = Value
-        end)
+        if Property ~= "Parent" then
+
+            pcall(function()
+                Object[Property] = Value
+            end)
+
+        end
     end
 
-    Object.Parent =
-        Parent
+    if Parent then
+        Object.Parent = Parent
+    end
 
     return Object
 end
+
+--// ============================================================
+--// LABEL
+--//
+--// Supports the current Rivals Hub calls.
+--// ============================================================
 
 local function Label(
     Parent,
@@ -274,47 +414,59 @@ local function Label(
     Size,
     Position,
     TextSize,
-    Color
+    Color,
+    Font
 )
 
-    return New(
-        "TextLabel",
-        Parent,
-        {
-            Size =
-                Size or UDim2.fromScale(
-                    1,
-                    1
-                ),
+    local Object =
+        New(
+            "TextLabel",
+            Parent,
+            {
+                Size =
+                    Size
+                    or UDim2.fromScale(
+                        1,
+                        1
+                    ),
 
-            Position =
-                Position or UDim2.fromOffset(
-                    0,
-                    0
-                ),
+                Position =
+                    Position
+                    or UDim2.fromOffset(
+                        0,
+                        0
+                    ),
 
-            BackgroundTransparency = 1,
+                BackgroundTransparency = 1,
 
-            Text = Text or "",
+                Text =
+                    Text or "",
 
-            TextColor3 =
-                Color or Config.Text,
+                TextColor3 =
+                    Color
+                    or Config.Text,
 
-            TextSize =
-                TextSize or 11,
+                TextSize =
+                    TextSize
+                    or 11,
 
-            Font =
-                Enum.Font.GothamSemibold,
+                Font =
+                    Font
+                    or Enum.Font.GothamSemibold,
 
-            TextXAlignment =
-                Enum.TextXAlignment.Left,
+                TextXAlignment =
+                    Enum.TextXAlignment.Left,
 
-            TextYAlignment =
-                Enum.TextYAlignment.Center,
+                TextYAlignment =
+                    Enum.TextYAlignment.Center,
 
-            ZIndex = 10
-        }
-    )
+                BorderSizePixel = 0,
+
+                ZIndex = 10
+            }
+        )
+
+    return Object
 end
 
 --// ============================================================
